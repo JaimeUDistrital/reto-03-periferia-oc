@@ -108,4 +108,5 @@ export type EventoAgente =
   | { tipo: "mensaje"; texto: string }
   | { tipo: "oc_creada"; orden: OrdenCompra }
   | { tipo: "error"; mensaje: string; correlationId: string }
-  | { tipo: "fin"; historial: TurnoHistorial[] };
+  /** `historial` solo viene si la conversación cambió (chat); «Evaluar sin IA» no lo envía. */
+  | { tipo: "fin"; historial?: TurnoHistorial[] };

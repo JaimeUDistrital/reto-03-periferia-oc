@@ -56,7 +56,7 @@ describe("ejecutarAgente: tools sin confirmación", () => {
     await ejecutarAgente({ historial: previo, mensaje: "Valida", llm, nucleo, emitir, firmarToken });
 
     const fin = evento(eventos, "fin");
-    assert.deepEqual(fin.historial.map((t) => t.tipo), ["usuario", "modelo", "usuario", "modelo", "resultado_tool", "modelo"]);
+    assert.deepEqual((fin.historial ?? []).map((t) => t.tipo), ["usuario", "modelo", "usuario", "modelo", "resultado_tool", "modelo"]);
     assert.equal(previo.length, 2, "no muta el historial de entrada");
   });
 

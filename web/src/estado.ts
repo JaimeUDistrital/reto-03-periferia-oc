@@ -101,6 +101,6 @@ export function aplicarEvento(estado: Estado, evento: EventoAgente): Estado {
         items: [...estado.items, { tipo: "error", mensaje: evento.mensaje, correlationId: evento.correlationId }],
       };
     case "fin":
-      return { ...estado, historial: evento.historial };
+      return { ...estado, historial: evento.historial ?? estado.historial };
   }
 }

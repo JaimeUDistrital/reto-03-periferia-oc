@@ -52,13 +52,20 @@ export async function confirmar(token: string, accion: "aprobar" | "rechazar"): 
   }
 }
 
+/** Lee la respuesta de GET /api/solicitudes: `{ solicitudes: string[] }`. */
+export function extraerSolicitudes(json: unknown): string[] | null {
+  if (typeof json !== "object" || json === null || !("solicitudes" in json)) return null;
+  const lista: unknown = json.solicitudes;
+  if (!Array.isArray(lista) || lista.length === 0) return null;
+  const ids = lista.filter((s): s is string => typeof s === "string");
+  return ids.length === lista.length ? ids : null;
+}
+
 export async function listarSolicitudes(): Promise<string[]> {
   try {
     const resp = await fetch("/api/solicitudes");
-    const json: unknown = await resp.json();
-    if (resp.ok && Array.isArray(json) && json.length > 0 && json.every((s) => typeof s === "string")) {
-      return json as string[];
-    }
+    const ids = resp.ok ? extraerSolicitudes(await resp.json()) : null;
+    if (ids) return ids;
   } catch {
     // cae a la lista estática
   }

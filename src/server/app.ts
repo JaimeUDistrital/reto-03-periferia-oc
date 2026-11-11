@@ -206,7 +206,7 @@ export function crearApp(deps: DepsApp): Hono {
         });
         const confirmacion = eventoConfirmacion(dictamen, firmar);
         if (confirmacion) await emitir(confirmacion);
-        await emitir({ tipo: "fin", historial: [] });
+        await emitir({ tipo: "fin" });
       },
       async (error, stream) => {
         const correlationId = randomUUID();
