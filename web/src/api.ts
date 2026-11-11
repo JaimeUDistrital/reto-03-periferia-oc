@@ -33,12 +33,12 @@ async function leerSse(url: string, cuerpo: unknown, alEvento: (e: EventoChat) =
   }
 }
 
-/** POST /api/chat. `confirmar` = caso que el usuario acaba de confirmar (solo desde la tarjeta o un «sí» claro). */
+/** POST /api/chat. `confirmar` = caso que el usuario confirma con el botón de la tarjeta; el texto libre lo evalúa el servidor. */
 export const chat = (sessionId: string, message: string, confirmar: string | undefined, alEvento: (e: EventoChat) => void) =>
   leerSse("/api/chat", confirmar ? { sessionId, message, confirmar } : { sessionId, message }, alEvento);
 
-/** POST /api/evaluar: leer, validar y construir la OC sin LLM. */
-export const evaluar = (caso: string, alEvento: (e: EventoChat) => void) => leerSse("/api/evaluar", { caso }, alEvento);
+/** POST /api/evaluar: leer, validar y construir la OC sin LLM. Con la sesión, el servidor deja el caso pendiente para «Confirmar». */
+export const evaluar = (sessionId: string, caso: string, alEvento: (e: EventoChat) => void) => leerSse("/api/evaluar", { caso, sessionId }, alEvento);
 
 /** Lee la respuesta de GET /api/casos: `{ casos: string[] }`. */
 export function extraerCasos(json: unknown): string[] | null {

@@ -8,11 +8,13 @@ import type { Pendiente } from "./sesiones";
 const MAX_LARGO_CONFIRMACION = 200;
 
 const NEGACION = /\b(no|nunca|jamas|ni|sin|cancel\w*|rechaz\w*|deten\w*|espera\w*|todavia|aun)\b/;
-const CONFIRMA = [
-  /\bconfirm(o|ado|amos|a)\b/,
-  /^si\b[\s,.!]*(crea\w*|procede\w*|adelante|confirm\w*|ok|dale|hazlo|por favor)?[\s.!]*$/,
-  /\b(procede\w*|adelante|creala|crearla|apruebo|autorizo|acepto|hazlo|dale|de acuerdo)\b/,
-];
+/** Autorización explícita en primera persona: basta con que aparezca («Confirmo la creación de la OC de sol-004»). */
+const AUTORIZA = /\b(confirmo|confirmado|confirmamos|apruebo|autorizo)\b/;
+/**
+ * Sin verbo explícito, el mensaje entero debe estar hecho de estas palabras («sí, créala», «ok, adelante»).
+ * Así «dale un vistazo…» o «adelante con el análisis» no cuentan como confirmación.
+ */
+const AFIRMATIVAS = new Set(["si", "ok", "okay", "vale", "dale", "adelante", "procede", "hazlo", "crea", "creala", "crearla", "crear", "la", "oc", "orden", "de", "compra", "acuerdo", "claro", "listo", "perfecto", "correcto", "acepto", "por", "favor", "gracias"]);
 const ID_CASO = /\bsol-\d+\b/g;
 
 function normalizar(texto: string): string {
@@ -28,7 +30,9 @@ export function esConfirmacion(texto: string): boolean {
   const t = normalizar(texto);
   if (t === "" || t.length > MAX_LARGO_CONFIRMACION || t.includes("?")) return false;
   if (NEGACION.test(t)) return false;
-  return CONFIRMA.some((patron) => patron.test(t));
+  if (AUTORIZA.test(t)) return true;
+  const palabras = t.replace(ID_CASO, " ").split(/[^a-z0-9]+/).filter(Boolean);
+  return palabras.length > 0 && palabras.every((p) => AFIRMATIVAS.has(p));
 }
 
 function mencionaOtroCaso(texto: string, caso: string): boolean {
@@ -46,8 +50,8 @@ export interface EntradaConfirmacion {
 /** Caso que el usuario confirma en este turno, o null. */
 export function casoConfirmado({ pendiente, mensaje, confirmar }: EntradaConfirmacion): string | null {
   if (!pendiente) return null;
-  if (confirmar !== undefined) return confirmar === pendiente.caso ? pendiente.caso : null;
   if (mencionaOtroCaso(mensaje, pendiente.caso)) return null;
+  if (confirmar !== undefined) return confirmar === pendiente.caso ? pendiente.caso : null;
   return esConfirmacion(mensaje) ? pendiente.caso : null;
 }
 

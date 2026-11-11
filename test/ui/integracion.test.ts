@@ -39,14 +39,14 @@ describe("integración UI ↔ servidor", () => {
     assert.deepEqual(recibidos, [{ tipo: "fin" }]);
   });
 
-  it("evaluar envía el caso", async () => {
+  it("evaluar envía el caso y la sesión (para que «Confirmar» funcione al primer clic)", async () => {
     let cuerpo: unknown;
     globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
       cuerpo = JSON.parse(String(init?.body));
       return sseDe([{ tipo: "fin" }]);
     }) as typeof fetch;
-    await evaluar("sol-004", () => {});
-    assert.deepEqual(cuerpo, { caso: "sol-004" });
+    await evaluar("s-1", "sol-004", () => {});
+    assert.deepEqual(cuerpo, { caso: "sol-004", sessionId: "s-1" });
   });
 
   it("si la red falla, emite un error de cliente reintentable y el estado lo muestra", async () => {

@@ -159,17 +159,6 @@ export const mensajeNoConfirmar = (caso: string): string => `No confirmo, no cre
 /** Código de seguimiento de los errores que genera el propio cliente (red caída). */
 export const ID_ERROR_RED = "cliente";
 
-/**
- * ¿El texto libre es una confirmación inequívoca? Conservador: ante un "no", una pregunta
- * o cualquier duda devuelve false (así nunca se envía `confirmar` por accidente).
- */
-export function esConfirmacion(texto: string): boolean {
-  const t = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[¿?¡!.,;:]/g, (c) => (c === "?" || c === "¿" ? "?" : " ")).trim();
-  if (t.includes("?")) return false;
-  if (/\b(no|nunca|sin|tampoco|todavia|aun|cancela|rechazo)\b/.test(t)) return false;
-  return /^(si|ok|vale|dale|adelante|procede|confirmo|confirmar|confirmado|de acuerdo|claro)\b/.test(t);
-}
-
 /** El modelo responde con algo de markdown; lo dejamos como texto limpio (sin HTML). */
 export function limpiarMarkdown(texto: string): string {
   return texto

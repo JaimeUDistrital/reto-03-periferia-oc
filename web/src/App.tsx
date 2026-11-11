@@ -6,7 +6,7 @@ import { aplicarEvento, agregarMensajeUsuario, estadoInicial } from "./estado";
 import type { Estado } from "./estado";
 import { crearSesion } from "./sesion";
 import type { Almacen } from "./sesion";
-import { agruparItems, esConfirmacion, ID_ERROR_RED, mensajeConfirmar, mensajeNoConfirmar, mensajeProcesar, PROMPT_DEMO } from "./vista";
+import { agruparItems, ID_ERROR_RED, mensajeConfirmar, mensajeNoConfirmar, mensajeProcesar, PROMPT_DEMO } from "./vista";
 
 const PREGUNTA_EJEMPLO = "¿Qué controles revisas antes de crear una orden de compra?";
 const PASOS = [
@@ -91,7 +91,7 @@ export function App() {
     setOcupado(false);
   }
 
-  /** `confirmar`: caso que el usuario confirma (tarjeta o «sí» claro). Sin él, nada se confirma. */
+  /** `confirmar`: caso que el usuario confirma con el botón de la tarjeta. El texto libre («sí, créala») lo evalúa el servidor. */
   async function enviar(mensaje: string, confirmar?: string) {
     const limpio = mensaje.trim();
     if (!limpio || ocupado) return;
@@ -100,13 +100,12 @@ export function App() {
   }
 
   async function enviarTexto(mensaje: string) {
-    const pendiente = estado.confirmacion;
-    await enviar(mensaje, pendiente && esConfirmacion(mensaje) ? pendiente.caso : undefined);
+    await enviar(mensaje);
   }
 
   async function revisarSinIa() {
     if (!seleccion || ocupado) return;
-    await ejecutar(`Revisar ${seleccion} sin IA`, () => evaluar(seleccion, alEvento));
+    await ejecutar(`Revisar ${seleccion} sin IA`, () => evaluar(sesion.actual(), seleccion, alEvento));
   }
 
   function nuevaConversacion() {

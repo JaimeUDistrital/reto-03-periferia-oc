@@ -17,6 +17,23 @@ describe("esConfirmacion", () => {
       assert.equal(esConfirmacion(t), false, t);
     }
   });
+
+  it("rechaza frases que usan «dale», «adelante» o «confirma» sin autorizar la OC (revisión de código)", () => {
+    for (const t of [
+      "dale un vistazo al motivo del RC5 en sol-004 por favor",
+      "adelante con el análisis y dime qué falta",
+      "confirma el valor de la cotización con el proveedor",
+      "procede a revisar el IVA",
+    ]) {
+      assert.equal(esConfirmacion(t), false, t);
+    }
+  });
+
+  it("acepta afirmaciones cortas y el texto del botón", () => {
+    for (const t of ["sí, crea la OC", "ok, adelante", "Confirmo la creación de la OC de sol-004.", "apruebo", "sí, créala por favor"]) {
+      assert.equal(esConfirmacion(t), true, t);
+    }
+  });
 });
 
 describe("casoConfirmado", () => {
@@ -34,6 +51,10 @@ describe("casoConfirmado", () => {
     assert.equal(casoConfirmado({ pendiente, mensaje: "x", confirmar: "sol-005" }), null);
     assert.equal(casoConfirmado({ pendiente, mensaje: "confirmo sol-005" }), null);
     assert.equal(casoConfirmado({ pendiente, mensaje: "confirmo sol-004" }), "sol-004");
+  });
+
+  it("con el botón, un mensaje que nombra otro caso tampoco confirma", () => {
+    assert.equal(casoConfirmado({ pendiente, mensaje: "sí, crea sol-002 también", confirmar: "sol-004" }), null);
   });
 
   it("no confirma con negación", () => {

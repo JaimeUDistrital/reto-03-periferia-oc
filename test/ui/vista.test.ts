@@ -5,7 +5,6 @@ import { ordenGrabada, validacionGrabada } from "../../web/src/dev/eventos-graba
 import {
   agruparItems,
   argumentosCompactos,
-  esConfirmacion,
   estadoValidacion,
   etiquetaTool,
   formatearMonto,
@@ -171,13 +170,6 @@ describe("mensajes y confirmación por texto", () => {
     assert.equal(mensajeNoConfirmar("sol-004"), "No confirmo, no crees la OC de sol-004.");
   });
 
-  it("reconoce confirmaciones claras", () => {
-    for (const t of ["Confirmo", "sí, confirmo", "Si", "ok", "Adelante", "Confirmo la creación de la OC de sol-004."]) assert.equal(esConfirmacion(t), true, t);
-  });
-
-  it("no toma como confirmación negaciones ni preguntas", () => {
-    for (const t of ["No confirmo", "no", "No la crees todavía", "¿Qué pasa si confirmo?", "Muéstrame el detalle", "sin confirmar"]) assert.equal(esConfirmacion(t), false, t);
-  });
 });
 
 describe("resumenHerramientas", () => {
