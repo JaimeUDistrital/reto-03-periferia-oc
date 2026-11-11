@@ -55,118 +55,140 @@ Base: `6850373` (contratos `src/domain/contratos-oc.ts`, fixtures reales, casos 
 | A3 | UI de chat, tool calls, HITL, «Evaluar sin IA» | UI | ✅ | en main: typecheck OK · test 19/19 · build OK · sin innerHTML · merge `f699b44` |
 | A4 | README, SOLUCION (borrador), GLOSSARY | DOCS | ✅ | 3 archivos, 8 secciones, 6 ADR, 16 marcas «no verificado» · merge `a352934` |
 | A5 | Merge, /code-review medium, security-auditor, deploy, humo en URL | ORQ | 🔄 | ✅ 4 merges · ✅ humo local: sol-001 → confirmación → OC `4533205732`; token alterado → 401; sol-002 sin confirmación; CSP estricta. ✅ ajustes 1 y 2 con TDD (`c3927f1`, test 202/202). ✅ humo en Railway (22:50): chat sol-001 → `evaluarSolicitud` + `crearOrdenCompra` → confirmación → OC `4533205732`; token alterado → 401; reenvío → misma OC. Falta: ajuste 3 (carga de `.env` en local), /code-review medium, security-auditor |
-| B1 | PRD + fixtures reales → matriz §8 y casos esperados | ORQ | ⬜ | — |
-| B2 | Adaptar data y controles a los datos reales | CORE | ⬜ | — |
-| B3 | SOLUCION con matriz y retroactivas reales; ajustes de UI | DOCS · UI | ⬜ | — |
-| B4 | Revisión final, push, humo de los 6 casos en URL, RELEVO final | ORQ | ⬜ | — |
+| B1 | PRD + fixtures reales → contratos, casos esperados y matriz §8 | ORQ | ✅ | `6850373` · test 188/188 · matriz §8 |
+| B2 | Núcleo: 5 herramientas + P1, RC1–RC10, SAP en archivos, control, evidencia, `demo.ts` | CORE | 🔄 | — |
+| B3 | Agente: adaptador LLM, ciclo (25 it.), tope de tokens, sesiones, guardia de confirmación, `src/server.ts`, `out/log.jsonl`, prompt + conocimiento | AGENTE | 🔄 | — |
+| B4 | UI: eventos nuevos, confirmación con ambos valores, tabla de la OC, resultado de la validación | UI | 🔄 | — |
+| B5 | Docs: `SOLUCION.md` (12 secciones), `README.md`, `GLOSSARY.md` | DOCS | 🔄 | — |
+| B6 | Integrar ramas, `package.json` / `.env.example` / tsconfig, bonus `modulo/`, /code-review medium, demo 6/6 | ORQ | ⬜ | — |
+| B7 | Push → Railway → humo de los 6 casos en la URL | 👤 push + ORQ | ⬜ | — |
+| B8 | Cifras reales en SOLUCION, RELEVO final, push final | ORQ + 👤 push | ⬜ | — |
 
-## 1. Entregables y criterio de aceptación
+## 1. Entregables y criterio de aceptación (PRD §9)
 
 | # | Entregable | Hecho cuando |
 |---|---|---|
-| 1 | Repo: `agent/prompt.md`, `src/tools/oc.ts` (zod), backend y chat con tool calls + HITL | typecheck y tests en verde; el chat muestra cada tool call y pide confirmación antes de crear la OC |
-| 2 | `demo.ts` | `npm run demo` procesa sol-001…006 **sin red ni clave**, exit 0, dictámenes = esperados |
-| 3 | URL pública (Railway) | responde y permite probar los 6 casos en el navegador |
-| 4 | `SOLUCION.md` | arquitectura, ciclo del agente, matriz de controles (generada por `demo.ts`), adaptador SAP real, análisis de retroactivas |
+| 1 | Repo limpio con historial | `git ls-files` sin `node_modules/`, `out/` ni `.env` |
+| 2 | App: chat + backend + herramientas + LLM | typecheck y tests en verde; el chat muestra cada herramienta (nombre, argumentos, resultado resumido) y resalta las confirmaciones |
+| 3 | `demo.ts` | `npm run demo` sin clave ni red: 6 casos = `test/core/casos.esperados.ts`, idempotencia de sol-001, confirmación explícita de sol-004, exit 0, determinista salvo timestamps |
+| 4 | URL pública (Railway) | `/api/health` OK y los 6 casos se prueban por chat |
+| 5 | `SOLUCION.md` | las 12 secciones del PRD §9.1, con adaptador SAP real y declaración de IA |
+| 6 | `README.md` | un comando de arranque, variables de `.env.example`, demo y link |
+| 7 | Bonus `modulo/` | `test/orq/modulo.test.ts` verde: mismas piezas que la app, sin copias divergentes |
 
 ## 2. Principios
 
-1. **El código decide; el LLM orquesta y explica.** El dictamen sale de `evaluarSolicitud()` (pura). Chat y `demo.ts` usan la misma función.
-2. **HITL por código, no por prompt.** `crearOrdenCompra` solo se ejecuta con un token de confirmación humana (un uso, TTL, ligado a solicitud + hash del dictamen).
-3. **Capa anticorrupción.** `src/data/` valida con Zod el formato de los fixtures y lo traduce al dominio. A las 23:00 cambia `src/data/`, no el resto.
-4. **Documentos = datos no confiables** (posible prompt injection).
-5. **Mínimo que resuelve del todo.** Cada archivo tiene un solo dueño (§3).
+1. **El código decide; el LLM orquesta y explica.** Las herramientas son la única fuente de valores (CA2). Chat y `demo.ts` usan las mismas herramientas.
+2. **Confirmación humana por código, no por prompt.** `oc_crear` no crea si hay confirmaciones sin `confirmado = true`; y en el servidor ese `confirmado` solo vale si el usuario confirmó ESE caso en su último mensaje (`ctx.confirmacionHumana`). El modelo no puede autoconfirmarse.
+3. **No se confía en lo que devuelve el modelo.** Las herramientas releen la fuente por `caso`; si el modelo envía paquete, derivados o payload, se verifican (`PAYLOAD_ALTERADO`).
+4. **Separación que evalúan:** comportamiento en `agent/prompt.md` · conocimiento en `src/knowledge/ordenes-compra.md` · ejecución en `src/tools/oc.ts`. Un cambio de reglas no toca el servidor.
+5. **Documentos = datos no confiables** (prompt injection).
+6. **Mínimo que resuelve del todo.** Un dueño por archivo (§3).
 
-## 3. Mapa de archivos y dueños
+## 3. Mapa de archivos y dueños (fase B)
 
 ```
-agent/prompt.md              AGENTE   system prompt
-src/domain/contratos.ts      ORQ      tipos compartidos (§4) — solo los cambia ORQ
-src/data/                    CORE     loaders + esquemas Zod de los fixtures
-src/domain/controles.ts      CORE     registro de controles puros {id, nombre, severidad, evaluar}
-src/domain/evaluar.ts        CORE     evaluarSolicitud(id) → Dictamen
-src/tools/oc.ts              CORE     tools zod (entrada/salida) + exports puros para demo.ts
-src/sap/simulador.ts         CORE     SapGateway simulado, idempotente por solicitud
-demo.ts                      CORE     6 casos sin LLM; exit ≠ 0 si un dictamen ≠ esperado
-src/security/                AGENTE   redact (logs), mask (LLM/UI), envolverDocumento, límites
-src/agent/loop.ts            AGENTE   bucle LLM ↔ tools, tope de iteraciones, pausa HITL
-src/agent/gemini.ts          AGENTE   adaptador LlmPort → @google/genai
-src/server/                  AGENTE   Hono: /api/chat (SSE), /api/confirmar, /api/evaluar (sin IA), estáticos
-web/                         UI       React + Vite + Tailwind
-test/<dueño>/                cada dueño en su subcarpeta
-README.md, SOLUCION.md, docs/GLOSSARY.md      DOCS
-docs/PLAN.md, docs/RELEVO.md, package.json, tsconfig*.json, .github/   ORQ
-fixtures/reto-03/            CORE (2 mocks en A1) → ORQ (reales en B1)
+agent/prompt.md                     AGENTE  comportamiento (system prompt)
+src/knowledge/ordenes-compra.md     AGENTE  conocimiento del proceso
+src/domain/contratos-oc.ts          ORQ     contratos compartidos (§4)
+src/domain/*, src/data/*            CORE    paquete, reglas RC1–RC10, payload, evidencia, listado de casos
+src/tools/oc.ts                     CORE    SOLO herramientas: leer_paquete, validar, construir_payload, generar_evidencia, crear, leer_excel
+src/sap/adapter.ts, src/sap/mock.ts CORE    SapAdapter + simulación en out/sap/ordenes.jsonl
+demo.ts                             CORE    6 casos sin LLM
+src/llm/adapter.ts, gemini.ts       AGENTE  interfaz enviar() + implementación Gemini
+src/agent/                          AGENTE  registro de herramientas, ciclo, sesiones, log
+src/server.ts                       AGENTE  Hono: /api/chat, /api/sessions/:id, /api/health, /api/casos, /api/evaluar
+src/security/, src/config/          AGENTE  redact, mask, documentos, límites, env
+web/                                UI      React + Vite + Tailwind
+modulo/, scripts/modulo.ts          ORQ     bonus (generado + test de sincronía)
+README.md, SOLUCION.md, docs/GLOSSARY.md            DOCS
+docs/PLAN.md, docs/RELEVO.md, package.json, tsconfig*.json, .env.example, .github/   ORQ
+fixtures/reto-03/                   Periferia (solo lectura)
+out/                                generado en ejecución (ignorado)
+test/<dueño>/                       cada dueño en su subcarpeta
 ```
 
-**Stack verificado (2026-11-10):** Node ≥ 22.12 (lo exige @google/genai 3.1.0) · zod 4.6.7 (`z.toJSONSchema`) · @google/genai 3.1.0 (`generateContent` + `functionDeclarations` con `parametersJsonSchema`; `response.functionCalls`) · modelo por defecto `gemini-3.6-flash` (estable) · hono 4.13.17 · Vite 8 + React 19 + Tailwind 4 · TypeScript 7.0.2. Ejecutar TS con `node --import tsx …` (la CLI `tsx` choca con el sandbox).
+**Stack verificado (2026-11-10):** Node ≥ 22.12 · zod 4.6.7 (`z.toJSONSchema`, `z.ZodRawShape`) · @google/genai 3.1.0 · modelo por defecto `gemini-3.6-flash` · hono 4.13.17 · Vite 8 + React 19 + Tailwind 4 · TypeScript 7.0.2 · pdf-lib 1.17.1 · read-excel-file 9.3.14 (`npm audit`: 0). Ejecutar TS con `node --import tsx …`.
 
-## 4. Contratos (A0 · `src/domain/contratos.ts`)
+## 4. Contratos (`src/domain/contratos-oc.ts`, fase B)
 
-- `ResultadoControl` = `{ id, nombre, estado: 'OK' | 'ALERTA' | 'BLOQUEO', detalle, evidencia }`
-- `Dictamen` = `{ solicitudId, decision, controles: ResultadoControl[], hash }` — los valores de `decision` se cierran en B1 con el PRD.
-- `ToolDef<I, O>` = `{ nombre, descripcion, entrada: ZodType<I>, salida: ZodType<O>, requiereConfirmacion, ejecutar(i): Promise<O> }`
-- `LlmPort.generar(historial, tools)` → `{ texto?, llamadas: { id, nombre, args }[] }`
-- `SapGateway.crearOrdenCompra(solicitudId, dictamen)` → `{ numero }` (idempotente)
-- `EventoAgente` (SSE): `tool_call` · `tool_result` · `confirmacion_requerida` · `mensaje` · `oc_creada` · `error` · `fin`
+- `HerramientaOC` = `{ description, args: ZodRawShape, execute(args, ctx) → Promise<string> }`; el modelo la ve como `oc_<export>`; devuelve `{ok:true,data}` o `{ok:false,error,codigo}` y nunca lanza.
+- `CtxHerramienta` = `{ directory, sessionId, confirmacionHumana?(caso), ahora?() }`.
+- `Hallazgo` = `{ regla: RC1…RC10, detalle, accion_sugerida, valores? }` · `Validacion` = `{ caso, solicitud_id, apta, bloqueos, confirmaciones, derivados, retroactiva }`.
+- `OrdenCompraSchema` (PRD §7.4) · `SapAdapter` (PRD §7.4) · `OcCreada` = `{ numero_oc, fecha, idempotente, retroactiva, evidencia }`.
+- `CodigoError`: `BLOQUEADA` · `REQUIERE_CONFIRMACION` · `CONFIRMACION_NO_HUMANA` · `PAYLOAD_ALTERADO` · `ENTRADA_INVALIDA` · `ERROR`.
+- `EventoChat` (SSE): `tool_call` · `tool_result` · `confirmacion_requerida {caso, confirmaciones}` · `oc_creada` · `mensaje` · `error` · `fin`.
+- `src/domain/contratos.ts` (fase A) se borra al integrar.
 
 ## 5. Seguridad
 
-1. **Secretos:** la clave solo vive en el servidor; `env` validado con Zod al arrancar (falla rápido); `redact()` borra claves y tokens de logs y errores; al cliente, error genérico + `correlationId`.
-2. **Minimización hacia el LLM:** las tools reciben IDs (`solicitudId`), no documentos crudos; sus salidas pasan por `mask()` (correos, teléfonos, cuentas, documentos de identidad, NIT parcial, nombres → iniciales).
-3. **UI pública sin login:** muestra los mismos datos enmascarados que ve el LLM.
-4. **Prompt injection:** documentos envueltos en `<documento_externo>` con el cierre escapado; el prompt los declara datos; el dictamen no depende del LLM.
+1. **Secretos:** la clave solo vive en el backend (variable de entorno validada con Zod); `redact()` limpia logs y errores; al cliente, error legible + `correlationId`; `/api/health` nunca devuelve la clave.
+2. **Datos:** las herramientas reciben `caso` y leen la fuente ellas mismas; los fixtures son ficticios; los correos se enmascaran en `out/log.jsonl` y en los logs del servidor.
+3. **Link público sin login** (lo permite el PRD §6.1): tope de sesiones en memoria, de mensajes y de tokens por sesión para que nadie gaste la clave sin límite.
+4. **Prompt injection:** textos de correos, cotizaciones y aprobaciones son datos; el prompt lo declara y las decisiones no dependen del LLM.
 5. **XSS:** el texto del LLM se pinta como texto, nunca como HTML; `secureHeaders` con CSP.
-6. **Abuso y coste:** `bodyLimit`, longitud máxima de mensaje, rate limit por IP, tope de iteraciones y de tokens de salida, timeout por llamada.
-7. **HITL sin estado en servidor:** token HMAC-SHA256 (`HITL_SECRET`) sobre `{solicitudId, hash, exp}` con TTL de 10 min; al confirmar se reevalúa y el hash debe coincidir. Repetir el token no duplica: el número de OC se deriva de la solicitud (SAP idempotente). Así funciona igual en Railway o Vercel.
-8. **Repo:** `.env` ignorado, solo `.env.example`; versiones exactas + lockfile; `npm audit` en CI.
-9. **Gemini:** en el nivel gratuito Google puede usar entradas y salidas para mejorar sus productos y personas pueden revisarlas; en el de pago, no (fuente: https://aistudio.google.com/docs/terms). Por eso al LLM solo llega lo enmascarado.
+6. **Abuso y coste:** `bodyLimit`, longitud máxima de mensaje, rate limit por IP, `MAX_ITERACIONES` (25), `MAX_TOKENS_SESION`, timeout al LLM.
+7. **Confirmación humana con guardia en servidor:** la sesión guarda `pendiente {caso, confirmaciones}`; `ctx.confirmacionHumana(caso)` solo es true si el último mensaje del usuario confirma ese caso (botón con `confirmar: caso` o texto afirmativo sin negación). Sustituye al token HMAC de la fase A.
+8. **Herramientas sin shell;** `caso` validado con regex y existencia (sin rutas); `leer_excel` confinado a `fixtures/`.
+9. **Repo:** `.env` y `out/` ignorados, solo `.env.example`; versiones exactas + lockfile; `npm audit` en CI.
+10. **Gemini:** en el nivel gratuito Google puede usar entradas y salidas para mejorar sus productos; en el de pago, no (https://aistudio.google.com/docs/terms).
 
 ## 6. Pruebas (método agent-skills `test-driven-development`)
 
-- Ciclo **RED → GREEN → REFACTOR**. Un test que pasa a la primera es sospechoso.
-- Pirámide ~80/15/5:
-  - **Pequeñas** (`node:test`, sin I/O): cada control, parsers, `mask`/`redact`, reductor de eventos de la UI.
-  - **Medianas:** `app.request()` de Hono con un `LlmPort` **falso** (fake, no mock): tool_call → confirmacion_requerida → /confirmar → oc_creada; token reusado → rechazo; sin token → nunca hay OC.
-  - **Grandes (1–2):** humo en la URL pública con Claude in Chrome.
-- **Casos dorados:** `test/core/casos.esperados.ts` con el dictamen esperado de cada sol-00X (lo fija ORQ en B1). `demo.ts` y los tests lo comparan.
-- Real > fake > stub > mock · Arrange-Act-Assert · un concepto por test · nombres que se leen como especificación.
-- Bugs: patrón **Prove-It** (test que reproduce → arreglo → suite completa).
-- Comandos: `npm run typecheck` · `npm test` · `npm run demo` · `npm run build`.
+- Ciclo **RED → GREEN → REFACTOR**; Prove-It para bugs.
+- **Pequeñas** (`node:test`): cada regla RC1–RC10, parsers de cotización y factura, payload contra su esquema, sha256, `mask`/`redact`, reductor de la UI.
+- **Medianas:** herramientas sobre copias de fixtures en carpetas temporales (SAP secuencial, idempotente y concurrente; `control.csv`; nunca lanzan); `app.request()` de Hono con LLM falso: caso limpio crea sin confirmación; caso con confirmación → `confirmacion_requerida`; `confirmado:true` sin humano → `CONFIRMACION_NO_HUMANA`; «confirmo» → `oc_creada`.
+- **Grandes:** `npm run demo` 6/6 y humo en la URL pública.
+- **Casos dorados:** `test/core/casos.esperados.ts` (fijado en B1). `demo.ts` y los tests lo comparan.
+- Comandos: `npm run typecheck` · `npm test` · `npm run demo` · `npm run build` · `npm run modulo`.
 
 ## 7. Tareas
 
-### Fase A — antes de las 23:00
+### Fase A — antes de las 23:00 (cerrada)
 
-| ID | Dueño · modelo/esfuerzo | Qué | Hecho cuando |
-|---|---|---|---|
-| A0 | ORQ · Opus | git, .gitignore, deps, tsconfig, contratos, 2 mocks mínimos, CI, primer commit | typecheck verde; repo en GitHub |
-| A1 | CORE · Sonnet/high | data, controles, evaluar, tools/oc.ts, sap, demo.ts + tests | tests verdes; demo 2/2 con mocks |
-| A2 | AGENTE · Sonnet/high | security, loop, Gemini, server, prompt.md + tests medianos | tests verdes; `/api/evaluar` responde |
-| A3 | UI · Sonnet/medium | chat, selector sol-00X, tarjetas de tool call, HITL, botón «Evaluar sin IA» | build verde; reductor probado; funciona con eventos grabados |
-| A4 | DOCS · Sonnet/medium | README, SOLUCION (arquitectura, ciclo, adaptador SAP, retroactivas genérico, ADR), GLOSSARY | nombres SAP verificados |
-| A5 | ORQ | merge, /code-review medium, security-auditor, deploy, humo en URL | URL viva con flujo completo |
+A0–A6 en el tablero (§0). El diseño HITL por token HMAC y el respaldo en Vercel se retiran en la fase B.
 
 ### Fase B — 23:00 → 01:00
 
-| ID | Dueño · modelo/esfuerzo | Qué | Hecho cuando |
-|---|---|---|---|
-| B1 | ORQ · Opus (esfuerzo máximo) | PRD + fixtures reales → matriz §8 y casos esperados | matriz y commit |
-| B2 | CORE · Sonnet/high | adaptar data y controles | tests + demo 6/6 |
-| B3 | DOCS · Haiku/low · UI · Sonnet/low (paralelo) | matriz en SOLUCION desde demo; retroactivas con datos reales; etiquetas UI | — |
-| B4 | ORQ | /code-review medium, push, humo de los 6 casos en URL, RELEVO final | 6/6 en URL |
+| ID | Dueño · modelo/esfuerzo | Qué | Hecho cuando | Hora objetivo |
+|---|---|---|---|---|
+| B1 | ORQ · Opus | PRD + fixtures → contratos, casos esperados, matriz §8, deps | commit + test verde | ✅ 23:17 |
+| B2 | CORE · Sonnet/high | herramientas, reglas, SAP, control, evidencia (txt + PDF), `leer_excel`, `demo.ts` | typecheck + tests de core; demo 6/6 exit 0 | 00:00 |
+| B3 | AGENTE · Sonnet/high | adaptador LLM, ciclo, sesiones, guardia, `src/server.ts`, log, prompt + conocimiento | tests verdes; guardia probada | 00:00 |
+| B4 | UI · Sonnet/medium | chat con eventos nuevos, confirmación, tabla de la OC | build verde; reductor probado | 23:55 |
+| B5 | DOCS · Sonnet/medium | SOLUCION (12), README, GLOSSARY | secciones completas; marcas `VERIFICAR` listadas | 23:55 |
+| B6 | ORQ · Opus | integración, config, bonus, /code-review medium, demo 6/6 | todo verde en `main` | 00:25 |
+| B7 | 👤 push + ORQ | Railway + humo de los 6 casos por chat en la URL | 6/6 en la URL | 00:45 |
+| B8 | ORQ | cifras reales en SOLUCION, RELEVO final, push final | entrega lista | 01:00 |
 
-## 8. Matriz de controles (se llena en B1)
+**Contingencia:** si a las 00:15 un subagente no terminó, ORQ integra lo que esté en verde y completa a mano el P0 que falte. Se recorta en este orden: `leer_excel` → PDF → bonus `modulo/`. Nunca se recorta: demo 6/6, guardia de confirmación, URL viva, SOLUCION 12 secciones.
 
-| Regla PRD | Control | sol-001 | sol-002 | sol-003 | sol-004 | sol-005 | sol-006 |
+## 8. Matriz de controles (B1, resultado esperado)
+
+✓ cumple · ✕ bloqueo · ! confirmación · ℹ derivado (solo informa) · — no aplica
+
+| Regla | Tipo | sol-001 | sol-002 | sol-003 | sol-004 | sol-005 | sol-006 |
 |---|---|---|---|---|---|---|---|
+| RC1 proveedor existe y activo | Bloqueo | ✓ | ✕ NIT 901999000 no existe | ✓ | ✓ | ✓ | ✓ (por nombre, sin NIT) |
+| RC2 aprobación válida del centro | Bloqueo | ✓ | ✓ | ✕ fvargas no aprueba CC-2020 | ✓ | ✓ | ✓ |
+| RC3 monto ≤ tope del aprobador | Bloqueo | ✓ 11,4 M ≤ 50 M | ✓ | — (depende de RC2) | ✓ 25 M ≤ 200 M | ✓ 3,2 M ≤ 30 M | ✓ 5,4 M ≤ 50 M |
+| RC4 subárea del centro | Bloqueo | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| RC5 cotización ±2 % | Confirmación | ✓ | ✓ | ✓ | ! 26,5 M vs 25 M (6 %) | ✓ | ✓ |
+| RC6 IVA ausente → derivado | Confirmación + derivado | ✓ | ✓ | ✓ | ✓ | ✓ | ! C1 del proveedor |
+| RC7 condiciones ausentes → derivado | Derivado | ✓ | ✓ | ✓ | ✓ | ✓ | ℹ Z030 del proveedor |
+| RC8 factura anterior → retroactiva | Confirmación | ✓ | ✓ | ✓ | ✓ | ! factura 10/08 < solicitud 27/08 | ✓ |
+| RC9 aprobación ≥ solicitud | Confirmación | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| RC10 cantidad × unitario = total (±1) | Bloqueo | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Resultado** | | OC directa 4500000001 | bloqueada | bloqueada | confirma → 4500000002 | confirma → 4500000003, retroactiva | confirma → 4500000004 |
+
+Numeración según `demo.ts` (out/ limpio; sol-001 dos veces; 004, 005 y 006 se confirman tras un primer intento pendiente).
 
 ## 9. Reglas para subagentes
 
-1. Lee §2–§6, tu tarea y `src/domain/contratos.ts`. Nada más salvo lo necesario.
-2. Solo tocas tus rutas (§3). ¿Hace falta cambiar un contrato o `package.json`? Para y pídelo en tu informe.
+1. Lee §2–§6, tu tarea y `src/domain/contratos-oc.ts`. Nada más salvo lo necesario.
+2. Solo tocas tus rutas (§3). ¿Hace falta cambiar un contrato, `package.json` o `.env.example`? Para y pídelo en tu informe.
 3. TDD (§6). Antes de terminar: typecheck + test (+ demo/build si aplica) en verde, con su salida.
 4. Commits pequeños en tu rama (`feat:`, `fix:`, `test:`), `git add` con rutas. Ni push ni merge.
-5. APIs de librerías: compruébalas en la doc oficial de la versión instalada (source-driven-development), no de memoria.
+5. APIs de librerías: compruébalas en la versión instalada (`node_modules`) o en su doc oficial, no de memoria.
 6. No escribes en `RELEVO.md`. Devuelves un informe: hecho · pendiente exacto · comandos y salida · dudas.
 7. Dos fallos seguidos en la misma prueba → paras y lo reportas (ORQ sube esfuerzo o modelo).
