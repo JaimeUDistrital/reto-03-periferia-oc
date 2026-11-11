@@ -1,12 +1,13 @@
 // Cliente HTTP del backend (usa fetch del navegador).
-import type { EventoAgente, TurnoHistorial } from "../../src/domain/contratos";
-import { esEventoAgente, extraerEventos } from "./sse";
+import type { EventoChat } from "../../src/domain/contratos-oc";
+import { extraerEventos } from "./sse";
+import { ID_ERROR_RED } from "./vista";
 
-export const SOLICITUDES_ESTATICAS = ["sol-001", "sol-002", "sol-003", "sol-004", "sol-005", "sol-006"];
+export const CASOS_ESTATICOS = ["sol-001", "sol-002", "sol-003", "sol-004", "sol-005", "sol-006"];
 
-const errorDeRed = (mensaje: string): EventoAgente => ({ tipo: "error", mensaje, correlationId: "cliente" });
+const errorDeRed = (mensaje: string): EventoChat => ({ tipo: "error", mensaje, correlationId: ID_ERROR_RED });
 
-async function leerSse(url: string, cuerpo: unknown, alEvento: (e: EventoAgente) => void): Promise<void> {
+async function leerSse(url: string, cuerpo: unknown, alEvento: (e: EventoChat) => void): Promise<void> {
   try {
     const resp = await fetch(url, {
       method: "POST",
@@ -14,7 +15,7 @@ async function leerSse(url: string, cuerpo: unknown, alEvento: (e: EventoAgente)
       body: JSON.stringify(cuerpo),
     });
     if (!resp.ok || !resp.body) {
-      alEvento(errorDeRed(`El servidor respondió ${resp.status}.`));
+      alEvento(errorDeRed(`El servidor respondió ${resp.status}. Puedes reintentar.`));
       return;
     }
     const lector = resp.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -28,46 +29,33 @@ async function leerSse(url: string, cuerpo: unknown, alEvento: (e: EventoAgente)
     }
     if (buffer.trim()) extraerEventos(buffer + "\n\n").eventos.forEach(alEvento);
   } catch {
-    alEvento(errorDeRed("No se pudo conectar con el servidor."));
+    alEvento(errorDeRed("No se pudo conectar con el servidor. Revisa tu conexión y reintenta."));
   }
 }
 
-export const chat = (historial: TurnoHistorial[], mensaje: string, alEvento: (e: EventoAgente) => void) =>
-  leerSse("/api/chat", { historial, mensaje }, alEvento);
+/** POST /api/chat. `confirmar` = caso que el usuario acaba de confirmar (solo desde la tarjeta o un «sí» claro). */
+export const chat = (sessionId: string, message: string, confirmar: string | undefined, alEvento: (e: EventoChat) => void) =>
+  leerSse("/api/chat", confirmar ? { sessionId, message, confirmar } : { sessionId, message }, alEvento);
 
-export const evaluar = (solicitudId: string, alEvento: (e: EventoAgente) => void) =>
-  leerSse("/api/evaluar", { solicitudId }, alEvento);
+/** POST /api/evaluar: leer, validar y construir la OC sin LLM. */
+export const evaluar = (caso: string, alEvento: (e: EventoChat) => void) => leerSse("/api/evaluar", { caso }, alEvento);
 
-export async function confirmar(token: string, accion: "aprobar" | "rechazar"): Promise<EventoAgente> {
-  try {
-    const resp = await fetch("/api/confirmar", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, accion }),
-    });
-    const json: unknown = await resp.json();
-    return esEventoAgente(json) ? json : errorDeRed(`Respuesta inesperada (${resp.status}).`);
-  } catch {
-    return errorDeRed("No se pudo conectar con el servidor.");
-  }
-}
-
-/** Lee la respuesta de GET /api/solicitudes: `{ solicitudes: string[] }`. */
-export function extraerSolicitudes(json: unknown): string[] | null {
-  if (typeof json !== "object" || json === null || !("solicitudes" in json)) return null;
-  const lista: unknown = json.solicitudes;
+/** Lee la respuesta de GET /api/casos: `{ casos: string[] }`. */
+export function extraerCasos(json: unknown): string[] | null {
+  if (typeof json !== "object" || json === null || !("casos" in json)) return null;
+  const lista: unknown = json.casos;
   if (!Array.isArray(lista) || lista.length === 0) return null;
   const ids = lista.filter((s): s is string => typeof s === "string");
   return ids.length === lista.length ? ids : null;
 }
 
-export async function listarSolicitudes(): Promise<string[]> {
+export async function listarCasos(): Promise<string[]> {
   try {
-    const resp = await fetch("/api/solicitudes");
-    const ids = resp.ok ? extraerSolicitudes(await resp.json()) : null;
+    const resp = await fetch("/api/casos");
+    const ids = resp.ok ? extraerCasos(await resp.json()) : null;
     if (ids) return ids;
   } catch {
     // cae a la lista estática
   }
-  return SOLICITUDES_ESTATICAS;
+  return CASOS_ESTATICOS;
 }
