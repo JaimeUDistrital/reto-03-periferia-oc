@@ -42,6 +42,11 @@ export function agregarMensajeUsuario(estado: Estado, texto: string): Estado {
   return { ...estado, items: [...estado.items, { tipo: "usuario", texto }] };
 }
 
+/** La decisión humana ya se envió: la confirmación deja de estar pendiente. */
+export function resolverConfirmacion(estado: Estado): Estado {
+  return { ...estado, confirmacion: null };
+}
+
 const ESTADOS_CONTROL = ["OK", "ALERTA", "BLOQUEO"];
 
 /** Reconoce la forma de un Dictamen en una salida de tool (`unknown`). */

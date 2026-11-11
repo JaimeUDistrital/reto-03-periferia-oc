@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { aplicarEvento, estadoInicial, agregarMensajeUsuario } from "../../web/src/estado";
+import { aplicarEvento, estadoInicial, agregarMensajeUsuario, resolverConfirmacion } from "../../web/src/estado";
 import type { Estado } from "../../web/src/estado";
 import { dictamenGrabado, eventosGrabados } from "../../web/src/dev/eventos-grabados";
 import type { EventoAgente } from "../../src/domain/contratos";
@@ -77,6 +77,12 @@ describe("reductor de eventos de la UI", () => {
     const antes = JSON.stringify(estadoInicial);
     aplicar(eventosGrabados);
     assert.equal(JSON.stringify(estadoInicial), antes);
+  });
+
+  it("resolverConfirmacion limpia la confirmación sin tocar el resto", () => {
+    const e = resolverConfirmacion(aplicar(hasta("confirmacion_requerida")));
+    assert.equal(e.confirmacion, null);
+    assert.deepEqual(e.dictamen, dictamenGrabado);
   });
 
   it("agrega el mensaje del usuario antes de los eventos del turno", () => {
