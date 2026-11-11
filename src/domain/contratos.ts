@@ -88,6 +88,17 @@ export interface SapGateway {
   crearOrdenCompra(solicitudId: string, dictamen: Dictamen): Promise<OrdenCompra>;
 }
 
+// ── Fachada del núcleo (la implementa CORE en src/tools/oc.ts) ──────────────
+
+export interface NucleoOC {
+  listarSolicitudes(): Promise<string[]>;
+  /** Pura y determinista: mismo expediente → mismo dictamen y mismo hash. */
+  evaluarSolicitud(solicitudId: string): Promise<Dictamen>;
+  /** Incluye crearOrdenCompra con requiereConfirmacion = true. */
+  herramientas: ToolDef[];
+  sap: SapGateway;
+}
+
 // ── Eventos servidor → UI (SSE) ─────────────────────────────────────────────
 
 export type EventoAgente =

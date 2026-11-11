@@ -38,8 +38,11 @@ src/server/                  AGENTE   Hono: /api/chat (SSE), /api/confirmar, /ap
 web/                         UI       React + Vite + Tailwind
 test/<dueño>/                cada dueño en su subcarpeta
 README.md, SOLUCION.md, docs/GLOSSARY.md      DOCS
-docs/PLAN.md, docs/RELEVO.md, package.json, tsconfig*.json, .github/, fixtures/   ORQ
+docs/PLAN.md, docs/RELEVO.md, package.json, tsconfig*.json, .github/   ORQ
+fixtures/reto-03/            CORE (2 mocks en A1) → ORQ (reales en B1)
 ```
+
+**Stack verificado (2026-11-10):** Node ≥ 22.12 (lo exige @google/genai 3.1.0) · zod 4.6.7 (`z.toJSONSchema`) · @google/genai 3.1.0 (`generateContent` + `functionDeclarations` con `parametersJsonSchema`; `response.functionCalls`) · modelo por defecto `gemini-3.6-flash` (estable) · hono 4.13.17 · Vite 8 + React 19 + Tailwind 4 · TypeScript 7.0.2. Ejecutar TS con `node --import tsx …` (la CLI `tsx` choca con el sandbox).
 
 ## 4. Contratos (A0 · `src/domain/contratos.ts`)
 
@@ -58,8 +61,9 @@ docs/PLAN.md, docs/RELEVO.md, package.json, tsconfig*.json, .github/, fixtures/ 
 4. **Prompt injection:** documentos envueltos en `<documento_externo>` con el cierre escapado; el prompt los declara datos; el dictamen no depende del LLM.
 5. **XSS:** el texto del LLM se pinta como texto, nunca como HTML; `secureHeaders` con CSP.
 6. **Abuso y coste:** `bodyLimit`, longitud máxima de mensaje, rate limit por IP, tope de iteraciones y de tokens de salida, timeout por llamada.
-7. **HITL:** token aleatorio de un uso, TTL 10 min; doble clic no crea 2 OC (SAP idempotente).
+7. **HITL sin estado en servidor:** token HMAC-SHA256 (`HITL_SECRET`) sobre `{solicitudId, hash, exp}` con TTL de 10 min; al confirmar se reevalúa y el hash debe coincidir. Repetir el token no duplica: el número de OC se deriva de la solicitud (SAP idempotente). Así funciona igual en Railway o Vercel.
 8. **Repo:** `.env` ignorado, solo `.env.example`; versiones exactas + lockfile; `npm audit` en CI.
+9. **Gemini:** en el nivel gratuito Google puede usar entradas y salidas para mejorar sus productos y personas pueden revisarlas; en el de pago, no (fuente: https://aistudio.google.com/docs/terms). Por eso al LLM solo llega lo enmascarado.
 
 ## 6. Pruebas (método agent-skills `test-driven-development`)
 
