@@ -15,6 +15,11 @@
 
 ## Registro (más reciente arriba)
 
+### A3 cerrada · UI (Sonnet/medium) → merge ORQ
+- **Hecho:** reductor puro `web/src/estado.ts`, parser SSE `web/src/sse.ts`, cliente `web/src/api.ts`, componentes (tool card, HITL, expediente, OC, errores), `App.tsx`. Merge `f699b44`.
+- **Pruebas (en main tras merge):** typecheck OK · test 19/19 · build OK (JS 72 kB gzip) · grep sin innerHTML.
+- **Pendiente exacto (A5, al integrar con AGENTE):** 1) si `/api/confirmar` falla, conservar la confirmación pendiente para reintentar (seguro: SAP idempotente); 2) que `fin` de `/api/evaluar` no borre el historial del chat (backend sin `fin` ahí o UI que lo ignore); 3) no probada aún en navegador ni contra el backend real.
+
 ### A4 cerrada · DOCS (Sonnet/medium) → merge ORQ
 - **Hecho:** README.md, SOLUCION.md (8 secciones, 6 ADR, 2 diagramas Mermaid), docs/GLOSSARY.md. Merge `a352934`.
 - **Pendiente exacto (B3):** rellenar `<!-- MATRIZ … -->` y `<!-- DATOS REALES B3 -->` en SOLUCION; `<!-- URL -->` en README; revisar las 16 marcas «(no verificado)» (nombres técnicos de campos SAP, cliente RFC para Node, auth OData, BAPIRET2); citar bien la fuente de Railpack (`https://railpack.com/languages/node`).
