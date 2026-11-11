@@ -4,16 +4,22 @@
 > 3) Sigue «Siguiente paso». Plan completo en [`PLAN.md`](PLAN.md); qué falta y qué está hecho, en su §0 (tablero).
 > Solo escribe el orquestador.
 
-## Estado ahora (22:35)
+## Estado ahora (22:50)
 
-- **Fase:** A1–A4 cerradas e integradas en `main`; A5 en curso.
-- **Funciona (con evidencia):** typecheck OK · test 198/198 · demo 2/2 (39 ms) · build OK · humo local completo (ver registro A5).
-- **Falta:** 3 ajustes de integración, /code-review medium, security-auditor, Railway (U4), confirmar `.env` (U1).
-- **Siguiente paso:** ajustes con TDD → commit → push del usuario → Railway.
-- **URL:** repo `github.com/JaimeUDistrital/reto-03-periferia-oc`; app — pendiente.
-- **Último commit en GitHub:** `7085878`
+- **Fase:** A1–A4 y A6 cerradas e integradas en `main`; A5 casi cerrada; a las 23:00 llegan PRD y fixtures (fase B).
+- **Funciona (con evidencia):** test 206/206 · demo 2/2 · build OK · humo completo en Railway con Gemini (ver registro 22:50).
+- **Falta:** importar en Vercel (U7), ajuste 3 (carga de `.env` en local), /code-review medium, security-auditor, confirmar `.env` (U1).
+- **Siguiente paso:** fase B en cuanto el usuario diga dónde están PRD y fixtures; Vercel cuando haya hueco.
+- **URL:** repo `github.com/JaimeUDistrital/reto-03-periferia-oc`; app https://reto-03-periferia-oc-production.up.railway.app
+- **Último commit en GitHub:** `f7a3dfb`
 
 ## Registro (más reciente arriba)
+
+### 22:50 · A5 (humo en Railway) · ORQ
+- **Hecho:** el usuario hizo push (`7085878..f7a3dfb`). Las 3 variables de Railway estaban guardadas pero sin aplicar: ORQ pulsó «Deploy» en Chrome.
+- **Pruebas (curl contra la URL):** `/api/evaluar` ya sin `historial` en `fin` (versión nueva). Chat «Evalúa sol-001 y crea la OC» → `evaluarSolicitud` + `crearOrdenCompra` → `confirmacion_requerida` APROBABLE → `/api/confirmar` → `oc_creada` 4533205732 (HTTP 200); token alterado → 401; reenvío del mismo token → misma OC (el `creadaEn` cambia: el simulador no guarda estado).
+- **Aviso:** `git status` muestra 14 archivos vacíos sin seguimiento (`.bashrc`, `.zshrc`, `!.env.example`…): puntos de montaje del sandbox; no están en ningún commit.
+- **Pendiente exacto:** U7 Vercel; ajuste 3; /code-review medium; security-auditor; probar la UI en el navegador.
 
 ### 22:35 · A5 (parcial) · ORQ
 - **Hecho:** merge A2 (`5550764`) y A1 (`7085878`, con plumbing de git porque `git merge` intenta guardar el estado y el sandbox tapa `.env.example`). Repo público creado por el usuario; `origin/main` = `7085878`.

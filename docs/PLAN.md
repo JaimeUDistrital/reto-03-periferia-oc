@@ -12,9 +12,9 @@ Solo lo actualiza el orquestador; nada pasa a ✅ sin el comando que lo prueba.
 
 | # | Entregable | Estado | Evidencia |
 |---|---|---|---|
-| 1 | Repo: `agent/prompt.md`, `src/tools/oc.ts` (zod), backend, chat con tool calls + HITL | 🔄 | todo integrado en `main`; humo local OK (ver A5). Falta: probar en navegador y chat con Gemini |
+| 1 | Repo: `agent/prompt.md`, `src/tools/oc.ts` (zod), backend, chat con tool calls + HITL | 🔄 | todo integrado en `main`; chat con Gemini OK en Railway (ver A5). Falta: probar la UI en el navegador |
 | 2 | `demo.ts` 6/6 sin LLM | 🔄 | 2/2 con datos simulados, 39 ms, exit 0. Falta: 6 casos reales (B2) |
-| 3 | URL pública con los 6 casos | 🔄 | https://reto-03-periferia-oc-production.up.railway.app — `/api/salud` OK, «Evaluar sin IA» sol-001 OK (curl). Falta: variables secretas, chat con Gemini, 6 casos reales, respaldo en Vercel |
+| 3 | URL pública con los 6 casos | 🔄 | https://reto-03-periferia-oc-production.up.railway.app — versión `f7a3dfb`; chat con Gemini, HITL y OC OK (curl, 22:50). Falta: 6 casos reales, respaldo en Vercel |
 | 4 | `SOLUCION.md` completo | 🔄 | borrador con 8 secciones; falta matriz y datos reales (B3) |
 
 **Tareas**
@@ -24,9 +24,9 @@ Solo lo actualiza el orquestador; nada pasa a ✅ sin el comando que lo prueba.
 | A0 | Git, deps verificadas, tsconfig, contratos, servidor y web mínimos, CI | ORQ | ✅ | typecheck OK · test 2/2 · build OK · `/api/salud` OK · `d10fd3b` |
 | U1 | `.env` con `GEMINI_API_KEY` y `HITL_SECRET` (la clave va en `.env`, **nunca** en `.env.example`) | 👤 | ⬜ | ORQ no puede leer `.env`: confírmalo tú con el `grep` del paso 1 |
 | U2 | Commit de `.env.example` | 👤 | ✅ | `7ab1d09`; en el repo público la clave está vacía (comprobado con `git grep`) |
-| U3 | Repo en GitHub + push | 👤 | ✅ | `JaimeUDistrital/reto-03-periferia-oc`; `origin/main` = `7085878` = local; sin archivos sensibles |
-| U4 | Railway: proyecto, variables y dominio | 👤 | 🔄 | proyecto y dominio ✅ (Node 22.23.4, deploy OK); falta pegar `GEMINI_API_KEY` y `HITL_SECRET` y pulsar Add. Trial: 5 días o 3,49 USD |
-| U6 | `git push` de los commits locales (tablero + arreglos) | 👤 | ⬜ | — |
+| U3 | Repo en GitHub + push | 👤 | ✅ | `JaimeUDistrital/reto-03-periferia-oc`; `origin/main` = `f7a3dfb` = local; sin archivos sensibles |
+| U4 | Railway: proyecto, variables y dominio | 👤 + ORQ | ✅ | Node 22.23.4; 3 variables aplicadas con «Deploy» (estaban sin aplicar); `/api/chat` responde con Gemini. Trial: 5 días o 3,49 USD |
+| U6 | `git push` de los commits locales (tablero + arreglos) | 👤 | ✅ | `7085878..f7a3dfb` |
 | A6 | Respaldo en Vercel (código) | VERCEL | ✅ | `api/index.ts` + `vercel.json`; en main: test 206/206 · build OK · merge `ff19149`. Riesgo no verificado: compilación de imports en Vercel → probar `/api/salud` en el primer deploy |
 | U7 | Importar el repo en Vercel + variables | 👤 + ORQ (Chrome) | ⬜ | Framework Preset «Other»; variables `GEMINI_API_KEY`, `GEMINI_MODEL`, `HITL_SECRET` |
 | U5 | Dato: ¿clave Gemini gratuita o de pago? ¿fecha de la defensa? | 👤 | ⬜ | — |
@@ -34,7 +34,7 @@ Solo lo actualiza el orquestador; nada pasa a ✅ sin el comando que lo prueba.
 | A2 | Bucle del agente, Gemini, seguridad, servidor, `prompt.md` | AGENTE | ✅ | en main: typecheck OK · test 115/115 · build OK · merge `5550764` |
 | A3 | UI de chat, tool calls, HITL, «Evaluar sin IA» | UI | ✅ | en main: typecheck OK · test 19/19 · build OK · sin innerHTML · merge `f699b44` |
 | A4 | README, SOLUCION (borrador), GLOSSARY | DOCS | ✅ | 3 archivos, 8 secciones, 6 ADR, 16 marcas «no verificado» · merge `a352934` |
-| A5 | Merge, /code-review medium, security-auditor, deploy, humo en URL | ORQ | 🔄 | ✅ 4 merges · ✅ humo local: sol-001 → confirmación → OC `4533205732`; token alterado → 401; sol-002 sin confirmación; CSP estricta. ✅ ajustes 1 y 2 con TDD (`c3927f1`, test 202/202). Falta: ajuste 3 (carga de `.env` en local), /code-review medium, security-auditor |
+| A5 | Merge, /code-review medium, security-auditor, deploy, humo en URL | ORQ | 🔄 | ✅ 4 merges · ✅ humo local: sol-001 → confirmación → OC `4533205732`; token alterado → 401; sol-002 sin confirmación; CSP estricta. ✅ ajustes 1 y 2 con TDD (`c3927f1`, test 202/202). ✅ humo en Railway (22:50): chat sol-001 → `evaluarSolicitud` + `crearOrdenCompra` → confirmación → OC `4533205732`; token alterado → 401; reenvío → misma OC. Falta: ajuste 3 (carga de `.env` en local), /code-review medium, security-auditor |
 | B1 | PRD + fixtures reales → matriz §8 y casos esperados | ORQ | ⬜ | — |
 | B2 | Adaptar data y controles a los datos reales | CORE | ⬜ | — |
 | B3 | SOLUCION con matriz y retroactivas reales; ajustes de UI | DOCS · UI | ⬜ | — |
