@@ -4,15 +4,19 @@
 > 3) Sigue «Siguiente paso». Plan completo en [`PLAN.md`](PLAN.md); qué falta y qué está hecho, en su §0 (tablero).
 > Solo escribe el orquestador.
 
-## Estado ahora (00:07)
+## Estado ahora (00:35)
 
-- **Fase:** B cerrada y desplegada (`83bedb9` en GitHub y Railway). Solo falta el zip con el apellido.
-- **Funciona (con evidencia, copia limpia con `git archive`):** `npm ci` OK · typecheck OK · test 258/258 · demo 6/6 exit 0 · build OK · `bun install && bun run demo.ts` exit 0 (Bun 1.4.4).
-- **Falta:** 👤 zip `reto-03-<apellido>.zip` con `git archive` (el contenido del mismo HEAD ya está comprobado: 162 archivos, sin `node_modules`, `out` ni `.env`).
+- **Fase:** entrega lista. B cerrada, desplegada y revisada.
+- **Funciona (con evidencia):** test 262/262 · typecheck · build · demo 6/6 con Node y con Bun 1.4.4 (copia limpia) · `bun run dev` en copia limpia · 6/6 casos con Gemini en Railway · interfaz probada en Chrome · CI de GitHub en verde.
+- **Falta (👤):** push de los últimos commits; copiar el zip `reto-03-martin.zip`; cerrar en GitHub la alerta de secret scanning como «Used in tests» (clave FALSA de ejemplo); vigilar el periodo de prueba de Railway antes de la defensa.
 - **URL:** repo `github.com/JaimeUDistrital/reto-03-periferia-oc`; app https://reto-03-periferia-oc-production.up.railway.app
-- **Último commit en GitHub:** `83bedb9` (más este cierre de docs)
 
 ## Registro (más reciente arriba)
+
+### 00:35 · Revisión final de entrega · ORQ
+- **Revisado con evidencia:** copia limpia con `git archive` (zip de 162 archivos sin `node_modules` ni `out`); historial sin claves reales (las 3 coincidencias son claves FALSAS de ejemplo de los tests de `redact`); `bun run dev` arranca en 5 s; `out/log.jsonl` se escribe; interfaz en Chrome sobre Railway (herramientas con argumentos, indicador de trabajo, tarjeta de confirmación, OC idempotente).
+- **Corregido:** `debb728` claves falsas partidas para que el escáner de GitHub no las marque; `1203169` el chat pinta las tablas markdown como tablas (antes salían barras «|»).
+- **Abierto y documentado:** 7 hallazgos de la revisión (SOLUCION §12); lector de Excel probado solo en errores (no hay `.xlsx` del reto).
 
 ### 00:07 · B7 humo en Railway con Gemini · ORQ
 - **Hecho:** push del usuario `f7a3dfb..83bedb9`; Railway desplegó en ~10 s (`/api/health` con `llm_configurado: true`). Diagramas Mermaid del README vistos en GitHub (3/3 se dibujan).
