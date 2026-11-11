@@ -1,32 +1,47 @@
-// Secuencia realista de eventos para desarrollar sin backend y para los tests.
+// Secuencia realista de eventos (caso sol-004) para desarrollar sin backend y para los tests.
 // Sin APIs del navegador: se compila también con el tsconfig raíz (sin DOM).
-import type { Dictamen, EventoAgente, TurnoHistorial } from "../../../src/domain/contratos";
+import type { EventoChat, Hallazgo, OrdenCompra, Validacion } from "../../../src/domain/contratos-oc";
 
-export const dictamenGrabado: Dictamen = {
-  solicitudId: "sol-001",
-  decision: "REQUIERE_REVISION",
-  hash: "9f2c1e7ab04d58f3c6d1a2b7e8f90c3d4a5b6c7d8e9f001122334455667788aa",
-  controles: [
-    { id: "CTRL-PROVEEDOR", nombre: "Proveedor activo", estado: "OK", detalle: "Proveedor activo y no bloqueado.", evidencia: { nit: "900.***.***-1" } },
-    { id: "CTRL-PRESUPUESTO", nombre: "Presupuesto disponible", estado: "OK", detalle: "Saldo suficiente en el centro de costo.", evidencia: { saldo: 48200000, monto: 12500000 } },
-    { id: "CTRL-CONTRATO", nombre: "Vigencia del contrato", estado: "ALERTA", detalle: "El contrato vence en 12 días.", evidencia: { vence: "2026-11-22" } },
-  ],
+export const confirmacionGrabada: Hallazgo = {
+  regla: "RC5",
+  detalle: "Cotización 26.500.000 COP vs solicitud 25.000.000 COP (6,0 %)",
+  accion_sugerida: "Confirma que aceptas el sobrecosto o pide una cotización corregida.",
+  valores: { solicitud: 25000000, cotizacion: 26500000 },
 };
 
-const historial: TurnoHistorial[] = [
-  { tipo: "usuario", texto: "Valida la solicitud sol-001" },
-  { tipo: "modelo", llamadas: [{ id: "c1", nombre: "consultar_solicitud", args: { solicitudId: "sol-001" } }] },
-  { tipo: "resultado_tool", llamadaId: "c1", nombre: "consultar_solicitud", resultado: { solicitudId: "sol-001" } },
-];
+export const validacionGrabada: Validacion = {
+  caso: "sol-004",
+  solicitud_id: "SOL-2026-004",
+  apta: true,
+  bloqueos: [],
+  confirmaciones: [confirmacionGrabada],
+  derivados: { indicador_iva: "C1", condiciones_pago: "Z030" },
+  retroactiva: false,
+};
 
-export const eventosGrabados: EventoAgente[] = [
-  { tipo: "tool_call", id: "c1", nombre: "consultar_solicitud", entrada: { solicitudId: "sol-001" } },
-  { tipo: "tool_result", id: "c1", nombre: "consultar_solicitud", ok: true, ms: 12, salida: { solicitudId: "sol-001", proveedor: "Suministros del Norte S.A.S.", nit: "900.***.***-1", monto: 12500000, moneda: "COP" } },
-  { tipo: "tool_call", id: "c2", nombre: "evaluar_solicitud", entrada: { solicitudId: "sol-001" } },
-  { tipo: "tool_result", id: "c2", nombre: "evaluar_solicitud", ok: true, ms: 31, salida: dictamenGrabado },
-  { tipo: "mensaje", texto: "La solicitud sol-001 requiere revisión: el contrato vence en 12 días. Los demás controles están en regla.\n¿Creo la orden de compra?" },
-  { tipo: "tool_call", id: "c3", nombre: "crear_orden_compra", entrada: { solicitudId: "sol-001" } },
-  { tipo: "confirmacion_requerida", token: "tok.demo.abc123", solicitudId: "sol-001", dictamen: dictamenGrabado },
-  { tipo: "oc_creada", orden: { numero: "4500001234", solicitudId: "sol-001", creadaEn: "2026-11-10T15:04:05.000Z" } },
-  { tipo: "fin", historial },
+export const ordenGrabada: OrdenCompra = {
+  referencia: { solicitud_id: "SOL-2026-004", correo_id: "mail-004", cotizacion_ref: "COT-77" },
+  sociedad: "1000",
+  organizacion_compras: "1000",
+  proveedor: { codigo_sap: "100045", nit: "900123456-1", nombre: "Servicios Andinos S.A.S." },
+  moneda: "COP",
+  condiciones_pago: "Z030",
+  aprobador: { email: "jefe@empresa.co", fecha_aprobacion: "2026-11-02", evidencia_sha256: "a".repeat(64) },
+  posiciones: [
+    { numero: 10, descripcion: "Licencias de analítica", cantidad: 5, unidad: "UN", precio_unitario: 5000000, centro_costo: "CC-100", subarea: "TI-01", indicador_iva: "C1" },
+  ],
+  excepciones: [{ codigo: "RC5", detalle: confirmacionGrabada.detalle, confirmado_por: null }],
+};
+
+export const eventosGrabados: EventoChat[] = [
+  { tipo: "tool_call", id: "c1", nombre: "oc_leer_paquete", entrada: { caso: "sol-004" } },
+  { tipo: "tool_result", id: "c1", nombre: "oc_leer_paquete", ok: true, ms: 8, salida: { ok: true, data: { caso: "sol-004" } } },
+  { tipo: "tool_call", id: "c2", nombre: "oc_validar", entrada: { caso: "sol-004" } },
+  { tipo: "tool_result", id: "c2", nombre: "oc_validar", ok: true, ms: 21, salida: { ok: true, data: validacionGrabada } },
+  { tipo: "tool_call", id: "c3", nombre: "oc_construir_payload", entrada: { caso: "sol-004" } },
+  { tipo: "tool_result", id: "c3", nombre: "oc_construir_payload", ok: true, ms: 15, salida: { ok: true, data: { orden: ordenGrabada, trazabilidad: "out/sol-004/trazabilidad.json" } } },
+  { tipo: "mensaje", texto: "La sol-004 tiene una confirmación pendiente (RC5). ¿Confirmas la creación de la OC?" },
+  { tipo: "confirmacion_requerida", caso: "sol-004", confirmaciones: [confirmacionGrabada] },
+  { tipo: "oc_creada", caso: "sol-004", numero_oc: "4500000002", fecha: "2026-11-10", idempotente: false, retroactiva: false, evidencia: "out/sol-004/aprobacion.txt" },
+  { tipo: "fin" },
 ];
