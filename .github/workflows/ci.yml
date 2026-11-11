@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Demo determinista (sin LLM ni red)
+        if: hashFiles('demo.ts') != ''
+        run: npm run demo
+      - run: npm run build
+      - name: Auditoría de dependencias (aviso, no bloquea)
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
