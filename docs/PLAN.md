@@ -14,19 +14,19 @@ Base: `6850373` (contratos `src/domain/contratos-oc.ts`, fixtures reales, casos 
 
 | Bloque | Criterio (PRD) | Quién | Estado |
 |---|---|---|---|
-| Entregables | Repo limpio sin `node_modules`, `out/`, `.env` | ORQ | 🔄 |
-| | URL pública viva (Railway) | ORQ + 👤 push | 🔄 |
-| | `demo.ts` 6 casos sin LLM, idempotencia sol-001, confirmación sol-004 | CORE | 🔄 |
-| | `SOLUCION.md` 12 secciones · `README.md` (un comando, variables, demo, link) | DOCS | 🔄 |
-| | Bonus `modulo/` (agent.md, tools/oc.ts, SKILL.md sin copias divergentes) | ORQ | 🔄 generador + test listos |
-| Arquitectura | `agent/prompt.md` · `src/knowledge/ordenes-compra.md` · `src/tools/oc.ts` | AGENTE · CORE | 🔄 |
-| | `src/llm/adapter.ts` (enviar) · `src/sap/adapter.ts` + `mock.ts` · `src/server.ts` (chat, sesiones, health) | AGENTE · CORE | 🔄 |
-| | `web/`: indicador de carga, tool calls con argumentos, confirmación resaltada | UI | 🔄 |
-| Herramientas | 5 tools zod (+ P1 `leer_excel`), devuelven JSON y nunca lanzan | CORE | 🔄 |
-| | `out/<caso>/trazabilidad.json`, `aprobacion.txt` + sha256 (+ P1 PDF) | CORE | 🔄 |
-| | `out/sap/ordenes.jsonl` desde 4500000001, idempotente · `out/control.csv` · `out/log.jsonl` | CORE · AGENTE | 🔄 |
-| Reglas | 25 iteraciones, CA2 en el prompt, RC1–RC10, resultados de los 6 casos | CORE · AGENTE | 🔄 |
-| No funcionales | Sin `any`, un comando < 120 s, clave solo en el backend, tope de tokens | todos | 🔄 |
+| Entregables | Repo limpio sin `node_modules`, `out/`, `.env` | ORQ | ✅ `git ls-files` sin coincidencias (23:45) |
+| | URL pública viva (Railway) | ORQ + 👤 push | 🔄 falta push de `737a0a0` + `4a3565a` y humo en la URL |
+| | `demo.ts` 6 casos sin LLM, idempotencia sol-001, confirmación sol-004 | CORE | ✅ exit 0, «OK: los 6 casos coinciden», OC 4500000001–4 |
+| | `SOLUCION.md` 12 secciones · `README.md` (un comando, variables, demo, link) | DOCS + ORQ | ✅ 0 marcas VERIFICAR (`4a3565a`) |
+| | Bonus `modulo/` (agent.md, tools/oc.ts, SKILL.md sin copias divergentes) | ORQ | ✅ `npm run modulo` + `test/orq/modulo.test.ts` |
+| Arquitectura | `agent/prompt.md` · `src/knowledge/ordenes-compra.md` · `src/tools/oc.ts` | AGENTE · CORE | ✅ |
+| | `src/llm/adapter.ts` · `src/sap/adapter.ts` + `mock.ts` · `src/server.ts` (chat, sesiones, health) | AGENTE · CORE | ✅ humo local: health, casos, evaluar sol-004 → RC5 |
+| | `web/`: indicador de carga, tool calls con argumentos, confirmación resaltada | UI | ✅ tests; ⬜ no visto en navegador |
+| Herramientas | 5 tools zod (+ P1 `leer_excel`), devuelven JSON y nunca lanzan | CORE | ✅ (`leer_excel`: solo rutas de error probadas) |
+| | `out/<caso>/trazabilidad.json`, `aprobacion.txt` + sha256 (+ P1 PDF) | CORE | ✅ `out/sol-004/` con los 3 archivos + PDF |
+| | `out/sap/ordenes.jsonl` desde 4500000001, idempotente · `out/control.csv` · `out/log.jsonl` | CORE · AGENTE | ✅ |
+| Reglas | 25 iteraciones, CA2 en el prompt, RC1–RC10, resultados de los 6 casos | CORE · AGENTE | ✅ (con el modelo real: ⬜ sin probar) |
+| No funcionales | Sin `any`, un comando < 120 s, clave solo en el backend, tope de tokens | todos | ✅ grep sin `any` · build 1 s · `/api/health` sin claves · tope 200 000 |
 
 **Entregables del reto (fase A)**
 
@@ -56,11 +56,11 @@ Base: `6850373` (contratos `src/domain/contratos-oc.ts`, fixtures reales, casos 
 | A4 | README, SOLUCION (borrador), GLOSSARY | DOCS | ✅ | 3 archivos, 8 secciones, 6 ADR, 16 marcas «no verificado» · merge `a352934` |
 | A5 | Merge, /code-review medium, security-auditor, deploy, humo en URL | ORQ | 🔄 | ✅ 4 merges · ✅ humo local: sol-001 → confirmación → OC `4533205732`; token alterado → 401; sol-002 sin confirmación; CSP estricta. ✅ ajustes 1 y 2 con TDD (`c3927f1`, test 202/202). ✅ humo en Railway (22:50): chat sol-001 → `evaluarSolicitud` + `crearOrdenCompra` → confirmación → OC `4533205732`; token alterado → 401; reenvío → misma OC. Falta: ajuste 3 (carga de `.env` en local), /code-review medium, security-auditor |
 | B1 | PRD + fixtures reales → contratos, casos esperados y matriz §8 | ORQ | ✅ | `6850373` · test 188/188 · matriz §8 |
-| B2 | Núcleo: 5 herramientas + P1, RC1–RC10, SAP en archivos, control, evidencia, `demo.ts` | CORE | 🔄 | — |
-| B3 | Agente: adaptador LLM, ciclo (25 it.), tope de tokens, sesiones, guardia de confirmación, `src/server.ts`, `out/log.jsonl`, prompt + conocimiento | AGENTE | 🔄 | — |
-| B4 | UI: eventos nuevos, confirmación con ambos valores, tabla de la OC, resultado de la validación | UI | 🔄 | — |
-| B5 | Docs: `SOLUCION.md` (12 secciones), `README.md`, `GLOSSARY.md` | DOCS | 🔄 | — |
-| B6 | Integrar ramas, `package.json` / `.env.example` / tsconfig, bonus `modulo/`, /code-review medium, demo 6/6 | ORQ | ⬜ | — |
+| B2 | Núcleo: 5 herramientas + P1, RC1–RC10, SAP en archivos, control, evidencia, `demo.ts` | CORE | ✅ | merge `b2fc36c` · demo 6/6 |
+| B3 | Agente: adaptador LLM, ciclo (25 it.), tope de tokens, sesiones, guardia de confirmación, `src/server.ts`, `out/log.jsonl`, prompt + conocimiento | AGENTE | ✅ | merge `19ef4c7` · sin probar con Gemini real |
+| B4 | UI: eventos nuevos, confirmación con ambos valores, tabla de la OC, resultado de la validación | UI | ✅ | merge `0930270` |
+| B5 | Docs: `SOLUCION.md` (12 secciones), `README.md`, `GLOSSARY.md` | DOCS | ✅ | merge `31bf1da` · marcas resueltas `4a3565a` |
+| B6 | Integrar ramas, `package.json` / `.env.example` / tsconfig, bonus `modulo/`, /code-review medium, demo 6/6 | ORQ | 🔄 | `737a0a0` · typecheck OK · test 255/255 · build OK · demo 6/6. Falta: resultado de /code-review medium; commit de `.env.example` (👤) |
 | B7 | Push → Railway → humo de los 6 casos en la URL | 👤 push + ORQ | ⬜ | — |
 | B8 | Cifras reales en SOLUCION, RELEVO final, push final | ORQ + 👤 push | ⬜ | — |
 

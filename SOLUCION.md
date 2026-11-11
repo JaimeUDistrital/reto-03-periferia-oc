@@ -211,7 +211,7 @@ Los que detecté al leer los fixtures:
 
 ## 11. Uso de IA
 
-**Qué usé.** Claude Code. Un orquestador (modelo Opus 5.5) planificó, escribió los contratos compartidos, integró el trabajo y revisó. Subagentes (modelo Sonnet) construyeron en paralelo, cada uno con archivos propios: el núcleo (herramientas, validación, SAP simulado, `demo.ts`), el agente (adaptador de Gemini, ciclo, servidor), la interfaz y esta documentación. Hubo además agentes de verificación para comprobar versiones y afirmaciones técnicas contra documentación oficial, y revisión de código y de seguridad antes de cerrar. La regla para los subagentes era tests antes que código; en las reglas de validación los tests se escribieron justo después del código, no antes. Declaro todo esto porque el PRD lo pide; reviso y puedo explicar lo que entrego.
+**Qué usé.** Claude Code. Un orquestador (modelo Opus 5.5) planificó, escribió los contratos compartidos, integró el trabajo y revisó. Subagentes (modelo Sonnet) construyeron en paralelo, cada uno con archivos propios: el núcleo (herramientas, validación, SAP simulado, `demo.ts`), el agente (adaptador de Gemini, ciclo, servidor), la interfaz y esta documentación. Hubo además agentes de verificación para comprobar versiones y afirmaciones técnicas contra documentación oficial, y una revisión de código antes de cerrar (resultado al final de §12). La auditoría de seguridad dedicada que planeé no la hice en la fase B. La regla para los subagentes era tests antes que código; en las reglas de validación los tests se escribieron justo después del código, no antes. Declaro todo esto porque el PRD lo pide; reviso y puedo explicar lo que entrego.
 
 **Qué descarté de lo que se propuso o evalué, y por qué.**
 
@@ -244,3 +244,20 @@ La fase A se hizo antes de recibir el PRD v2.0 con un enunciado genérico; la fa
 | Datos personales hacia un tercero (Gemini) | Nivel de pago, sin uso para entrenar, o proveedor con acuerdo; no enviar más datos de los necesarios |
 | Cambio de modelo o prompt degrada el comportamiento | Evals con los 6 casos como regresión (pasa/no pasa) antes de cambiar de modelo o prompt |
 | Datos de maestros y SAP con mapeos que no pude comprobar (unidades, indicadores, subárea) | Fase 0 de descubrimiento con el cliente y pruebas en un entorno de calidad (§6) |
+
+### Revisión de código antes de entregar
+
+Se pasó una revisión de correctitud (`/code-review medium`, contexto limpio) sobre todo el trabajo de la fase B (`f7a3dfb..HEAD`). Dio 10 hallazgos. Corregí con test previo los 3 que afectaban a la guardia humana o a la demo, y dejo los otros 7 a la vista en lugar de esconderlos:
+
+| # | Hallazgo | Estado |
+|---|---|---|
+| 1 | Frases como «dale un vistazo…» contaban como confirmación; la UI mandaba `confirmar` con una regla propia más débil | Corregido (`ff3273b`): el texto lo decide solo el servidor y debe ser una afirmación inequívoca; un mensaje que nombra otro caso no confirma |
+| 2 | «Revisar sin IA» no enviaba la sesión: «Confirmar» fallaba al primer clic | Corregido (`ff3273b`) |
+| 3 | Un IVA o unas condiciones vacías («») pasaban a la OC | Corregido (`8e36962`) |
+| 4 | Si una llamada a herramienta lanza a mitad de turno, el historial queda con una llamada sin respuesta y Gemini puede rechazar los turnos siguientes de esa sesión | Abierto. Mitigación: «Nueva conversación» crea otra sesión |
+| 5 | Una parte de Gemini con solo `thoughtSignature` se descarta; el modelo podría exigirla | Abierto; sin reproducir |
+| 6 | Sin proxy delante, `X-Forwarded-For` falsificado esquiva el límite por IP | Abierto. Que el proxy de Railway añada la IP real al final de la cabecera no lo verifiqué; en producción, confiar solo en el proxy conocido |
+| 7 | «Revisar sin IA» puede pisar el caso pendiente del chat en la misma sesión | Abierto; se usa un caso a la vez |
+| 8 | El historial de sesión no se recorta (código de recorte sin usar) | Abierto. El tope `MAX_TOKENS_SESION` corta el gasto |
+| 9 | RC5 compara totales sin mirar la moneda de la cotización | Abierto. Los 6 fixtures están en COP; en producción, añadir la moneda a RC5 |
+| 10 | La lectura de «aprobado» solo reconoce algunas negaciones («no he aprobado todavía» pasaría) | Abierto. En producción la aprobación debe venir de un flujo con estado, no de texto libre (ver riesgo «aprobación falsificada») |
