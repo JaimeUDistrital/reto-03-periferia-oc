@@ -1,0 +1,4 @@
+[
+  { "centro": "CC-100", "nombre": "Tecnología", "subareas": ["Infraestructura", "Desarrollo"], "lider": { "id": "L-100", "nombre": "Marta Gómez", "tope": 20000000 } },
+  { "centro": "CC-200", "nombre": "Compras y Logística", "subareas": ["Bodega", "Transporte"], "lider": { "id": "L-200", "nombre": "Luis Ramírez", "tope": 5000000 } }
+]

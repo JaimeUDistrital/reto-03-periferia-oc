@@ -1,0 +1,6 @@
+[
+  { "codigo": "CP00", "dias": 0, "descripcion": "Contado" },
+  { "codigo": "CP15", "dias": 15, "descripcion": "15 días" },
+  { "codigo": "CP30", "dias": 30, "descripcion": "30 días" },
+  { "codigo": "CP45", "dias": 45, "descripcion": "45 días" }
+]

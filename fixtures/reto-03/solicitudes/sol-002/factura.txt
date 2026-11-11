@@ -1,0 +1,5 @@
+FACTURA No. FE-0098
+Fecha de emisión: 2026-10-10
+Proveedor: Tecnología Cafetera Ltda.
+NIT: 800.765.432-1
+Total a pagar: 4760000.00
