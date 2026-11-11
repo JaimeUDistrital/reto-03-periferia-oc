@@ -4,15 +4,20 @@
 > 3) Sigue «Siguiente paso». Plan completo en [`PLAN.md`](PLAN.md); qué falta y qué está hecho, en su §0 (tablero).
 > Solo escribe el orquestador.
 
-## Estado ahora (00:05)
+## Estado ahora (00:07)
 
-- **Fase:** B integrada en `main` (`278b643`). Falta: push del usuario, humo en Railway con Gemini y zip.
+- **Fase:** B cerrada y desplegada (`83bedb9` en GitHub y Railway). Solo falta el zip con el apellido.
 - **Funciona (con evidencia, copia limpia con `git archive`):** `npm ci` OK · typecheck OK · test 258/258 · demo 6/6 exit 0 · build OK · `bun install && bun run demo.ts` exit 0 (Bun 1.4.4).
-- **Falta:** 👤 commit de `.env.example` + push; humo de los 6 casos en la URL; zip `reto-03-APELLIDO.zip`; ver los diagramas Mermaid en GitHub.
+- **Falta:** 👤 zip `reto-03-<apellido>.zip` con `git archive` (el contenido del mismo HEAD ya está comprobado: 162 archivos, sin `node_modules`, `out` ni `.env`).
 - **URL:** repo `github.com/JaimeUDistrital/reto-03-periferia-oc`; app https://reto-03-periferia-oc-production.up.railway.app
-- **Último commit en GitHub:** `f7a3dfb` (31 commits locales sin subir)
+- **Último commit en GitHub:** `83bedb9` (más este cierre de docs)
 
 ## Registro (más reciente arriba)
+
+### 00:07 · B7 humo en Railway con Gemini · ORQ
+- **Hecho:** push del usuario `f7a3dfb..83bedb9`; Railway desplegó en ~10 s (`/api/health` con `llm_configurado: true`). Diagramas Mermaid del README vistos en GitHub (3/3 se dibujan).
+- **Pruebas (curl a `/api/chat`, n=6, 0 errores):** sol-001 → 5 herramientas y OC 4500000001 sin intervención; sol-002 bloqueo RC1; sol-003 bloqueo RC2; sol-004 (prompt del PRD) → tabla + `confirmacion_requerida` RC5, sin OC; «confirmo» → OC 4500000002; sol-005 RC8 retroactiva → «sí, créala» → OC 4500000003 marcada retroactiva; sol-006 → `confirmacion_requerida` RC6.
+- **Observación:** en los casos bloqueados el modelo llama igual a `oc_generar_evidencia` y `oc_construir_payload`; la herramienta responde `BLOQUEADA` y no se crea nada.
 
 ### 00:05 · B6 cerrada · ORQ
 - **Hecho:** integración (`737a0a0`); marcas VERIFICAR resueltas (`4a3565a`); /code-review medium con 10 hallazgos: 3 corregidos con TDD (`ff3273b` confirmación solo en servidor y estricta + sesión en «Revisar sin IA», `8e36962` IVA vacío) y 7 documentados en SOLUCION §12; `667b739` `npm start` carga el archivo de entorno local con `--env-file-if-exists` (antes no lo cargaba nada); README con requisitos de versiones, Bun y 3 diagramas; `.nvmrc` (`278b643`).

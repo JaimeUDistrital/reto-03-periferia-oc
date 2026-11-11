@@ -255,7 +255,7 @@ Se pasó una revisión de correctitud (`/code-review medium`, contexto limpio) s
 | 2 | «Revisar sin IA» no enviaba la sesión: «Confirmar» fallaba al primer clic | Corregido (`ff3273b`) |
 | 3 | Un IVA o unas condiciones vacías («») pasaban a la OC | Corregido (`8e36962`) |
 | 4 | Si una llamada a herramienta lanza a mitad de turno, el historial queda con una llamada sin respuesta y Gemini puede rechazar los turnos siguientes de esa sesión | Abierto. Mitigación: «Nueva conversación» crea otra sesión |
-| 5 | Una parte de Gemini con solo `thoughtSignature` se descarta; el modelo podría exigirla | Abierto; sin reproducir |
+| 5 | Una parte de Gemini con solo `thoughtSignature` se descarta; el modelo podría exigirla | Abierto; no apareció en la prueba con Gemini en Railway (6 casos, 2 confirmaciones en un segundo turno) |
 | 6 | Sin proxy delante, `X-Forwarded-For` falsificado esquiva el límite por IP | Abierto. Que el proxy de Railway añada la IP real al final de la cabecera no lo verifiqué; en producción, confiar solo en el proxy conocido |
 | 7 | «Revisar sin IA» puede pisar el caso pendiente del chat en la misma sesión | Abierto; se usa un caso a la vez |
 | 8 | El historial de sesión no se recorta (código de recorte sin usar) | Abierto. El tope `MAX_TOKENS_SESION` corta el gasto |

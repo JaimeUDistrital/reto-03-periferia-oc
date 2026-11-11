@@ -15,7 +15,7 @@ Base: `6850373` (contratos `src/domain/contratos-oc.ts`, fixtures reales, casos 
 | Bloque | Criterio (PRD) | Quién | Estado |
 |---|---|---|---|
 | Entregables | Repo limpio sin `node_modules`, `out/`, `.env` | ORQ | ✅ `git ls-files` sin coincidencias (23:45) |
-| | URL pública viva (Railway) | ORQ + 👤 push | 🔄 falta push de `737a0a0` + `4a3565a` y humo en la URL |
+| | URL pública viva (Railway) | ORQ + 👤 push | ✅ `83bedb9` desplegado; humo con Gemini 6/6 |
 | | `demo.ts` 6 casos sin LLM, idempotencia sol-001, confirmación sol-004 | CORE | ✅ exit 0, «OK: los 6 casos coinciden», OC 4500000001–4 |
 | | `SOLUCION.md` 12 secciones · `README.md` (un comando, variables, demo, link) | DOCS + ORQ | ✅ 0 marcas VERIFICAR (`4a3565a`) |
 | | Bonus `modulo/` (agent.md, tools/oc.ts, SKILL.md sin copias divergentes) | ORQ | ✅ `npm run modulo` + `test/orq/modulo.test.ts` |
@@ -60,8 +60,8 @@ Base: `6850373` (contratos `src/domain/contratos-oc.ts`, fixtures reales, casos 
 | B3 | Agente: adaptador LLM, ciclo (25 it.), tope de tokens, sesiones, guardia de confirmación, `src/server.ts`, `out/log.jsonl`, prompt + conocimiento | AGENTE | ✅ | merge `19ef4c7` · sin probar con Gemini real |
 | B4 | UI: eventos nuevos, confirmación con ambos valores, tabla de la OC, resultado de la validación | UI | ✅ | merge `0930270` |
 | B5 | Docs: `SOLUCION.md` (12 secciones), `README.md`, `GLOSSARY.md` | DOCS | ✅ | merge `31bf1da` · marcas resueltas `4a3565a` |
-| B6 | Integrar ramas, `package.json` / `.env.example` / tsconfig, bonus `modulo/`, /code-review medium, demo 6/6 | ORQ | 🔄 | `737a0a0` · typecheck OK · test 255/255 · build OK · demo 6/6. Falta: resultado de /code-review medium; commit de `.env.example` (👤) |
-| B7 | Push → Railway → humo de los 6 casos en la URL | 👤 push + ORQ | ⬜ | — |
+| B6 | Integrar ramas, `package.json` / `.env.example` / tsconfig, bonus `modulo/`, /code-review medium, demo 6/6 | ORQ | ✅ | test 258/258 · demo 6/6 (Node y Bun 1.4.4) · review: 3 corregidos, 7 documentados · `83bedb9` |
+| B7 | Push → Railway → humo de los 6 casos en la URL | 👤 push + ORQ | ✅ | 6/6 con Gemini en la URL (ver RELEVO 00:07) |
 | B8 | Cifras reales en SOLUCION, RELEVO final, push final | ORQ + 👤 push | ⬜ | — |
 
 ## 1. Entregables y criterio de aceptación (PRD §9)
