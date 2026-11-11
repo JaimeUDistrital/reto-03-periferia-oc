@@ -1,14 +1,22 @@
-// Esqueleto mínimo (A0) para validar el despliegue. AGENTE lo amplía en A2.
 import { serve } from "@hono/node-server";
-import { serveStatic } from "@hono/node-server/serve-static";
-import { Hono } from "hono";
+import { crearLlmGemini } from "../agent/gemini";
+import { cargarEnv } from "../config/env";
+import { crearNucleoOC } from "../tools/oc";
+import { crearApp } from "./app";
 
-const app = new Hono();
+const env = cargarEnv(process.env);
+const nucleo = crearNucleoOC();
 
-app.get("/api/salud", (c) => c.json({ ok: true }));
-app.use("/*", serveStatic({ root: "./dist/web" }));
+const app = crearApp({
+  nucleo,
+  llm: env.geminiApiKey ? crearLlmGemini({ apiKey: env.geminiApiKey, modelo: env.geminiModel }) : undefined,
+  hitlSecret: env.hitlSecret,
+});
 
-const port = Number(process.env.PORT ?? 3000);
-serve({ fetch: app.fetch, port }, (info) => {
+if (!env.geminiApiKey) {
+  console.warn("GEMINI_API_KEY no definida: el chat con IA responderá un error; «Evaluar sin IA» sigue funcionando.");
+}
+
+serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`Servidor escuchando en el puerto ${info.port}`);
 });
