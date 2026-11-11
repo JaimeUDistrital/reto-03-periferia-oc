@@ -1,7 +1,8 @@
 # RELEVO — estado y bitácora (archivo único)
 
 > ¿Entras a mitad? 1) Lee «Estado ahora». 2) Corre `npm run typecheck && npm test && npm run demo`.
-> 3) Sigue «Siguiente paso». Plan completo en [`PLAN.md`](PLAN.md). Solo escribe el orquestador.
+> 3) Sigue «Siguiente paso». Plan completo en [`PLAN.md`](PLAN.md); qué falta y qué está hecho, en su §0 (tablero).
+> Solo escribe el orquestador.
 
 ## Estado ahora (21:58)
 

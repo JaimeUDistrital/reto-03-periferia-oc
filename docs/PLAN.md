@@ -3,6 +3,40 @@
 > Fuente de verdad del trabajo. Estado y bitácora: [`RELEVO.md`](RELEVO.md).
 > Reglas del reto: instructivo PDF + `PRD.md` (llega a las 23:00; queda fuera de git, se traduce a la §8).
 
+## 0. Tablero de avance
+
+Leyenda: ✅ hecho (con evidencia) · 🔄 en curso · ⬜ pendiente · 👤 lo haces tú.
+Solo lo actualiza el orquestador; nada pasa a ✅ sin el comando que lo prueba.
+
+**Entregables del reto**
+
+| # | Entregable | Estado | Evidencia |
+|---|---|---|---|
+| 1 | Repo: `agent/prompt.md`, `src/tools/oc.ts` (zod), backend, chat con tool calls + HITL | 🔄 | — |
+| 2 | `demo.ts` 6/6 sin LLM | ⬜ | — |
+| 3 | URL pública con los 6 casos | ⬜ | — |
+| 4 | `SOLUCION.md` completo | 🔄 | — |
+
+**Tareas**
+
+| ID | Qué | Quién | Estado | Evidencia |
+|---|---|---|---|---|
+| A0 | Git, deps verificadas, tsconfig, contratos, servidor y web mínimos, CI | ORQ | ✅ | typecheck OK · test 2/2 · build OK · `/api/salud` OK · `d10fd3b` |
+| U1 | `.env` con `GEMINI_API_KEY` y `HITL_SECRET` | 👤 | ⬜ | — |
+| U2 | Commit de `.env.example` | 👤 | ⬜ | — |
+| U3 | Repo en GitHub + push | 👤 | ⬜ | — |
+| U4 | Railway: proyecto, variables y dominio | 👤 | ⬜ | — |
+| U5 | Dato: ¿clave Gemini gratuita o de pago? ¿fecha de la defensa? | 👤 | ⬜ | — |
+| A1 | Núcleo determinista, tools, SAP simulado, `demo.ts` | CORE | 🔄 | — |
+| A2 | Bucle del agente, Gemini, seguridad, servidor, `prompt.md` | AGENTE | 🔄 | — |
+| A3 | UI de chat, tool calls, HITL, «Evaluar sin IA» | UI | 🔄 | — |
+| A4 | README, SOLUCION (borrador), GLOSSARY | DOCS | 🔄 | — |
+| A5 | Merge, /code-review medium, security-auditor, deploy, humo en URL | ORQ | ⬜ | — |
+| B1 | PRD + fixtures reales → matriz §8 y casos esperados | ORQ | ⬜ | — |
+| B2 | Adaptar data y controles a los datos reales | CORE | ⬜ | — |
+| B3 | SOLUCION con matriz y retroactivas reales; ajustes de UI | DOCS · UI | ⬜ | — |
+| B4 | Revisión final, push, humo de los 6 casos en URL, RELEVO final | ORQ | ⬜ | — |
+
 ## 1. Entregables y criterio de aceptación
 
 | # | Entregable | Hecho cuando |
