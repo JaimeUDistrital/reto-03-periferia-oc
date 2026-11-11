@@ -1,1 +1,30 @@
 @import "tailwindcss";
+
+/* Tokens: un solo acento; los estados siempre van con icono y texto, no solo color. */
+@theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-lienzo: #f3f5f7;
+  --color-papel: #ffffff;
+  --color-tinta: #16202b;
+  --color-tenue: #556170;
+  --color-linea: #dde2e8;
+  --color-acento: #1f4e8c;
+  --color-acento-fuerte: #183f72;
+  --color-acento-suave: #e8eef7;
+  --color-ok: #1b6e45;
+  --color-ok-suave: #e7f3ec;
+  --color-alerta: #8a5300;
+  --color-alerta-suave: #fbf0dc;
+  --color-bloqueo: #b0261b;
+  --color-bloqueo-suave: #fcebe9;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-lienzo);
+  color: var(--color-tinta);
+  -webkit-font-smoothing: antialiased;
+}
