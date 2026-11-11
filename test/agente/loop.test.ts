@@ -143,7 +143,8 @@ describe("ejecutarTurno: topes y errores (CA1, CA5, costo)", () => {
   });
 
   it("convierte un fallo del proveedor en error legible sin filtrar la clave", async () => {
-    const llm = llmGuionizado([new Error("401 en https://x.test/v1?key=AIzaSyD-1234567890abcdefghijklmnopqrstu")]);
+    // Clave falsa partida en dos para que el escáner de secretos de GitHub no la tome por real.
+    const llm = llmGuionizado([new Error("401 en https://x.test/v1?key=" + "AIza" + "SyD-1234567890abcdefghijklmnopqrstu")]);
     const t = montar(llm, crearEstado());
 
     await t.turno("hola");

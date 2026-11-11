@@ -11,7 +11,8 @@ import { crearLlmGemini } from "../../src/llm/gemini";
 import { crearApp, listarCasosEnDisco, type DepsApp } from "../../src/server";
 import { HALLAZGO_RC5, crearEstado, llamar, llmGuionizado, moduloFalso, texto, type EstadoFalso } from "./doble";
 
-const CLAVE = "AIzaSyD-clave-de-prueba-1234567890abcdef";
+// Clave falsa partida en dos para que el escáner de secretos de GitHub no la tome por real.
+const CLAVE = "AIza" + "SyD-clave-de-prueba-1234567890abcdef";
 let dir: string;
 beforeEach(async () => void (dir = await mkdtemp(join(tmpdir(), "server-"))));
 afterEach(async () => rm(dir, { recursive: true, force: true }));

@@ -13,7 +13,7 @@ describe("redact", () => {
   });
 
   it("elimina claves tipo sk-", () => {
-    const salida = redact("clave sk-abcdefghijklmnopqrstuvwx1234");
+    const salida = redact("clave sk-" + "abcdefghijklmnopqrstuvwx1234");
 
     assert.equal(salida.includes("sk-abcdefghijkl"), false);
   });
