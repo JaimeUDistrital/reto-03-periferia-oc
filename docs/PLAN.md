@@ -8,7 +8,27 @@
 Leyenda: ✅ hecho (con evidencia) · 🔄 en curso · ⬜ pendiente · 👤 lo haces tú.
 Solo lo actualiza el orquestador; nada pasa a ✅ sin el comando que lo prueba.
 
-**Entregables del reto**
+### Fase B (PRD real, 23:00 → 01:00) — lista de aceptación
+
+Base: `6850373` (contratos `src/domain/contratos-oc.ts`, fixtures reales, casos esperados, pdf-lib + read-excel-file). Vercel descartado (sesiones y `out/` no encajan en serverless).
+
+| Bloque | Criterio (PRD) | Quién | Estado |
+|---|---|---|---|
+| Entregables | Repo limpio sin `node_modules`, `out/`, `.env` | ORQ | 🔄 |
+| | URL pública viva (Railway) | ORQ + 👤 push | 🔄 |
+| | `demo.ts` 6 casos sin LLM, idempotencia sol-001, confirmación sol-004 | CORE | 🔄 |
+| | `SOLUCION.md` 12 secciones · `README.md` (un comando, variables, demo, link) | DOCS | 🔄 |
+| | Bonus `modulo/` (agent.md, tools/oc.ts, SKILL.md sin copias divergentes) | ORQ | 🔄 generador + test listos |
+| Arquitectura | `agent/prompt.md` · `src/knowledge/ordenes-compra.md` · `src/tools/oc.ts` | AGENTE · CORE | 🔄 |
+| | `src/llm/adapter.ts` (enviar) · `src/sap/adapter.ts` + `mock.ts` · `src/server.ts` (chat, sesiones, health) | AGENTE · CORE | 🔄 |
+| | `web/`: indicador de carga, tool calls con argumentos, confirmación resaltada | UI | 🔄 |
+| Herramientas | 5 tools zod (+ P1 `leer_excel`), devuelven JSON y nunca lanzan | CORE | 🔄 |
+| | `out/<caso>/trazabilidad.json`, `aprobacion.txt` + sha256 (+ P1 PDF) | CORE | 🔄 |
+| | `out/sap/ordenes.jsonl` desde 4500000001, idempotente · `out/control.csv` · `out/log.jsonl` | CORE · AGENTE | 🔄 |
+| Reglas | 25 iteraciones, CA2 en el prompt, RC1–RC10, resultados de los 6 casos | CORE · AGENTE | 🔄 |
+| No funcionales | Sin `any`, un comando < 120 s, clave solo en el backend, tope de tokens | todos | 🔄 |
+
+**Entregables del reto (fase A)**
 
 | # | Entregable | Estado | Evidencia |
 |---|---|---|---|

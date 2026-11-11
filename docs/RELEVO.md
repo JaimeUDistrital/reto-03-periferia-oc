@@ -15,6 +15,11 @@
 
 ## Registro (más reciente arriba)
 
+### 23:20 · B1 cerrada, B2 lanzada · ORQ
+- **Hecho:** PRD real leído (cambia el diseño: 5 herramientas `oc_*` con `execute → string`, RC1–RC10, confirmación conversacional con sesiones, SAP en archivos, 12 secciones de SOLUCION, bonus `modulo/`). Contratos en `src/domain/contratos-oc.ts`; fixtures reales en `fixtures/reto-03`; `test/core/casos.esperados.ts`; pdf-lib 1.17.1 y read-excel-file 9.3.14 con OK del usuario (`npm audit`: 0). Vercel retirado. Commit `6850373`, test 188/188.
+- **Lanzados (Sonnet, worktrees):** CORE (alto), AGENTE (alto), UI (medio), DOCS (medio). ORQ: generador `scripts/modulo.ts` + `test/orq/modulo.test.ts`.
+- **Pendiente exacto:** integrar ramas, `package.json` (`start` → `src/server.ts`, script `modulo`), `.env.example` (quitar `HITL_SECRET`, añadir `MAX_ITERACIONES`, `MAX_TOKENS_SESION`), tsconfig (`scripts`, `modulo`), demo 6/6, humo en Railway, push del usuario antes de la 01:00.
+
 ### 22:50 · A5 (humo en Railway) · ORQ
 - **Hecho:** el usuario hizo push (`7085878..f7a3dfb`). Las 3 variables de Railway estaban guardadas pero sin aplicar: ORQ pulsó «Deploy» en Chrome.
 - **Pruebas (curl contra la URL):** `/api/evaluar` ya sin `historial` en `fin` (versión nueva). Chat «Evalúa sol-001 y crea la OC» → `evaluarSolicitud` + `crearOrdenCompra` → `confirmacion_requerida` APROBABLE → `/api/confirmar` → `oc_creada` 4533205732 (HTTP 200); token alterado → 401; reenvío del mismo token → misma OC (el `creadaEn` cambia: el simulador no guarda estado).
