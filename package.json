@@ -9,10 +9,10 @@
   },
   "scripts": {
     "dev": "npm run build && npm start",
-    "dev:server": "node --watch --import tsx src/server.ts",
+    "dev:server": "node --watch --env-file-if-exists=.env --import tsx src/server.ts",
     "dev:web": "vite --config web/vite.config.ts",
     "build": "vite build --config web/vite.config.ts",
-    "start": "node --import tsx src/server.ts",
+    "start": "node --env-file-if-exists=.env --import tsx src/server.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p web/tsconfig.json",
     "test": "node --import tsx --test \"test/**/*.test.ts\"",
     "demo": "node --import tsx demo.ts",
