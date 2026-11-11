@@ -1,0 +1,25 @@
+# Dependencias y builds
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Secretos (solo se versiona .env.example)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Entorno local
+.claude/
+.idea/
+.vscode/
+.vercel/
+.DS_Store
+*.log
+
+# Documentos personales y del cliente: no se publican
+Documnetos_de_contexto/
+PRD.md
+*.pdf
