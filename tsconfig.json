@@ -16,5 +16,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "test", "demo.ts"]
+  "include": ["src", "test", "api", "demo.ts"]
 }
