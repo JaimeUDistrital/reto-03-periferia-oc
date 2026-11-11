@@ -4,16 +4,22 @@
 > 3) Sigue «Siguiente paso». Plan completo en [`PLAN.md`](PLAN.md); qué falta y qué está hecho, en su §0 (tablero).
 > Solo escribe el orquestador.
 
-## Estado ahora (21:58)
+## Estado ahora (22:35)
 
-- **Fase:** A0 cerrada; A1 CORE, A2 AGENTE, A3 UI y A4 DOCS en paralelo (worktrees en `.claude/worktrees/`).
-- **Funciona (con evidencia):** `npm run typecheck` OK · `npm test` 2/2 · `npm run build` OK · servidor local `/api/salud` → `{"ok":true}`.
-- **Falta:** repo en GitHub, proyecto en Railway, `.env` y commit de `.env.example` (los hace el usuario: el sandbox tapa `.env*` y no tiene credenciales de git).
-- **Siguiente paso:** A5 — merge de las 4 ramas, /code-review medium, security-auditor, deploy y humo en la URL.
-- **URL:** —
-- **Último commit:** `0603d39`
+- **Fase:** A1–A4 cerradas e integradas en `main`; A5 en curso.
+- **Funciona (con evidencia):** typecheck OK · test 198/198 · demo 2/2 (39 ms) · build OK · humo local completo (ver registro A5).
+- **Falta:** 3 ajustes de integración, /code-review medium, security-auditor, Railway (U4), confirmar `.env` (U1).
+- **Siguiente paso:** ajustes con TDD → commit → push del usuario → Railway.
+- **URL:** repo `github.com/JaimeUDistrital/reto-03-periferia-oc`; app — pendiente.
+- **Último commit en GitHub:** `7085878`
 
 ## Registro (más reciente arriba)
+
+### 22:35 · A5 (parcial) · ORQ
+- **Hecho:** merge A2 (`5550764`) y A1 (`7085878`, con plumbing de git porque `git merge` intenta guardar el estado y el sandbox tapa `.env.example`). Repo público creado por el usuario; `origin/main` = `7085878`.
+- **Pruebas:** typecheck OK · test 198/198 · demo 2/2 exit 0 · humo con servidor real: `/api/salud` OK; `/api/evaluar` sol-001 → 7 tool_call/7 tool_result + `confirmacion_requerida`; `/api/confirmar` → `oc_creada` 4533205732; token alterado → 401; sol-002 → sin confirmación; CSP `default-src 'self'`.
+- **Incidente:** el usuario pegó la clave real en `.env.example` (sin commitear). Comprobado con `git grep` que en GitHub la variable está vacía; plantilla local restaurada. Recomendado rotar la clave.
+- **Pendiente exacto:** 1) `fin` de `/api/evaluar` (`src/server/app.ts:209`) borra el historial de la UI → `historial` opcional en `fin`; 2) `/api/solicitudes` devuelve `{solicitudes:[…]}` y la UI espera `string[]` (cae a la lista estática); 3) `dev:server` sin `--env-file-if-exists`; 4) reintento de confirmación si falla la red; 5) /code-review medium + security-auditor.
 
 ### A3 cerrada · UI (Sonnet/medium) → merge ORQ
 - **Hecho:** reductor puro `web/src/estado.ts`, parser SSE `web/src/sse.ts`, cliente `web/src/api.ts`, componentes (tool card, HITL, expediente, OC, errores), `App.tsx`. Merge `f699b44`.

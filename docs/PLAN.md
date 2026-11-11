@@ -12,26 +12,26 @@ Solo lo actualiza el orquestador; nada pasa a ✅ sin el comando que lo prueba.
 
 | # | Entregable | Estado | Evidencia |
 |---|---|---|---|
-| 1 | Repo: `agent/prompt.md`, `src/tools/oc.ts` (zod), backend, chat con tool calls + HITL | 🔄 | — |
-| 2 | `demo.ts` 6/6 sin LLM | ⬜ | — |
-| 3 | URL pública con los 6 casos | ⬜ | — |
-| 4 | `SOLUCION.md` completo | 🔄 | — |
+| 1 | Repo: `agent/prompt.md`, `src/tools/oc.ts` (zod), backend, chat con tool calls + HITL | 🔄 | todo integrado en `main`; humo local OK (ver A5). Falta: probar en navegador y chat con Gemini |
+| 2 | `demo.ts` 6/6 sin LLM | 🔄 | 2/2 con datos simulados, 39 ms, exit 0. Falta: 6 casos reales (B2) |
+| 3 | URL pública con los 6 casos | ⬜ | falta Railway (U4) |
+| 4 | `SOLUCION.md` completo | 🔄 | borrador con 8 secciones; falta matriz y datos reales (B3) |
 
 **Tareas**
 
 | ID | Qué | Quién | Estado | Evidencia |
 |---|---|---|---|---|
 | A0 | Git, deps verificadas, tsconfig, contratos, servidor y web mínimos, CI | ORQ | ✅ | typecheck OK · test 2/2 · build OK · `/api/salud` OK · `d10fd3b` |
-| U1 | `.env` con `GEMINI_API_KEY` y `HITL_SECRET` | 👤 | ⬜ | — |
-| U2 | Commit de `.env.example` | 👤 | ⬜ | — |
-| U3 | Repo en GitHub + push | 👤 | ⬜ | — |
+| U1 | `.env` con `GEMINI_API_KEY` y `HITL_SECRET` (la clave va en `.env`, **nunca** en `.env.example`) | 👤 | ⬜ | ORQ no puede leer `.env`: confírmalo tú con el `grep` del paso 1 |
+| U2 | Commit de `.env.example` | 👤 | ✅ | `7ab1d09`; en el repo público la clave está vacía (comprobado con `git grep`) |
+| U3 | Repo en GitHub + push | 👤 | ✅ | `JaimeUDistrital/reto-03-periferia-oc`; `origin/main` = `7085878` = local; sin archivos sensibles |
 | U4 | Railway: proyecto, variables y dominio | 👤 | ⬜ | — |
 | U5 | Dato: ¿clave Gemini gratuita o de pago? ¿fecha de la defensa? | 👤 | ⬜ | — |
-| A1 | Núcleo determinista, tools, SAP simulado, `demo.ts` | CORE | 🔄 | — |
-| A2 | Bucle del agente, Gemini, seguridad, servidor, `prompt.md` | AGENTE | 🔄 | — |
+| A1 | Núcleo determinista, tools, SAP simulado, `demo.ts` | CORE | ✅ | en main: test 198/198 · demo 2/2 exit 0 · merge `7085878` |
+| A2 | Bucle del agente, Gemini, seguridad, servidor, `prompt.md` | AGENTE | ✅ | en main: typecheck OK · test 115/115 · build OK · merge `5550764` |
 | A3 | UI de chat, tool calls, HITL, «Evaluar sin IA» | UI | ✅ | en main: typecheck OK · test 19/19 · build OK · sin innerHTML · merge `f699b44` |
 | A4 | README, SOLUCION (borrador), GLOSSARY | DOCS | ✅ | 3 archivos, 8 secciones, 6 ADR, 16 marcas «no verificado» · merge `a352934` |
-| A5 | Merge, /code-review medium, security-auditor, deploy, humo en URL | ORQ | ⬜ | — |
+| A5 | Merge, /code-review medium, security-auditor, deploy, humo en URL | ORQ | 🔄 | ✅ 4 merges · ✅ humo local: sol-001 → confirmación → OC `4533205732`; token alterado → 401; sol-002 sin confirmación; CSP estricta. Falta: 3 ajustes (historial en «Evaluar sin IA», formato de `/api/solicitudes`, carga de `.env` en local), revisión, deploy |
 | B1 | PRD + fixtures reales → matriz §8 y casos esperados | ORQ | ⬜ | — |
 | B2 | Adaptar data y controles a los datos reales | CORE | ⬜ | — |
 | B3 | SOLUCION con matriz y retroactivas reales; ajustes de UI | DOCS · UI | ⬜ | — |
