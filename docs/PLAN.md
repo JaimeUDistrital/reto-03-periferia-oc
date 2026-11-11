@@ -27,7 +27,8 @@ Solo lo actualiza el orquestador; nada pasa a ✅ sin el comando que lo prueba.
 | U3 | Repo en GitHub + push | 👤 | ✅ | `JaimeUDistrital/reto-03-periferia-oc`; `origin/main` = `7085878` = local; sin archivos sensibles |
 | U4 | Railway: proyecto, variables y dominio | 👤 | 🔄 | proyecto y dominio ✅ (Node 22.23.4, deploy OK); falta pegar `GEMINI_API_KEY` y `HITL_SECRET` y pulsar Add. Trial: 5 días o 3,49 USD |
 | U6 | `git push` de los commits locales (tablero + arreglos) | 👤 | ⬜ | — |
-| A6 | Respaldo en Vercel | VERCEL | 🔄 | subagente trabajando |
+| A6 | Respaldo en Vercel (código) | VERCEL | ✅ | `api/index.ts` + `vercel.json`; en main: test 206/206 · build OK · merge `ff19149`. Riesgo no verificado: compilación de imports en Vercel → probar `/api/salud` en el primer deploy |
+| U7 | Importar el repo en Vercel + variables | 👤 + ORQ (Chrome) | ⬜ | Framework Preset «Other»; variables `GEMINI_API_KEY`, `GEMINI_MODEL`, `HITL_SECRET` |
 | U5 | Dato: ¿clave Gemini gratuita o de pago? ¿fecha de la defensa? | 👤 | ⬜ | — |
 | A1 | Núcleo determinista, tools, SAP simulado, `demo.ts` | CORE | ✅ | en main: test 198/198 · demo 2/2 exit 0 · merge `7085878` |
 | A2 | Bucle del agente, Gemini, seguridad, servidor, `prompt.md` | AGENTE | ✅ | en main: typecheck OK · test 115/115 · build OK · merge `5550764` |
