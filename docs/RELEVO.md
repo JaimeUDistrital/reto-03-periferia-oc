@@ -4,16 +4,20 @@
 > 3) Sigue «Siguiente paso». Plan completo en [`PLAN.md`](PLAN.md); qué falta y qué está hecho, en su §0 (tablero).
 > Solo escribe el orquestador.
 
-## Estado ahora (22:50)
+## Estado ahora (00:05)
 
-- **Fase:** A1–A4 y A6 cerradas e integradas en `main`; A5 casi cerrada; a las 23:00 llegan PRD y fixtures (fase B).
-- **Funciona (con evidencia):** test 206/206 · demo 2/2 · build OK · humo completo en Railway con Gemini (ver registro 22:50).
-- **Falta:** importar en Vercel (U7), ajuste 3 (carga de `.env` en local), /code-review medium, security-auditor, confirmar `.env` (U1).
-- **Siguiente paso:** fase B en cuanto el usuario diga dónde están PRD y fixtures; Vercel cuando haya hueco.
+- **Fase:** B integrada en `main` (`278b643`). Falta: push del usuario, humo en Railway con Gemini y zip.
+- **Funciona (con evidencia, copia limpia con `git archive`):** `npm ci` OK · typecheck OK · test 258/258 · demo 6/6 exit 0 · build OK · `bun install && bun run demo.ts` exit 0 (Bun 1.4.4).
+- **Falta:** 👤 commit de `.env.example` + push; humo de los 6 casos en la URL; zip `reto-03-APELLIDO.zip`; ver los diagramas Mermaid en GitHub.
 - **URL:** repo `github.com/JaimeUDistrital/reto-03-periferia-oc`; app https://reto-03-periferia-oc-production.up.railway.app
-- **Último commit en GitHub:** `f7a3dfb`
+- **Último commit en GitHub:** `f7a3dfb` (31 commits locales sin subir)
 
 ## Registro (más reciente arriba)
+
+### 00:05 · B6 cerrada · ORQ
+- **Hecho:** integración (`737a0a0`); marcas VERIFICAR resueltas (`4a3565a`); /code-review medium con 10 hallazgos: 3 corregidos con TDD (`ff3273b` confirmación solo en servidor y estricta + sesión en «Revisar sin IA», `8e36962` IVA vacío) y 7 documentados en SOLUCION §12; `667b739` `npm start` carga el archivo de entorno local con `--env-file-if-exists` (antes no lo cargaba nada); README con requisitos de versiones, Bun y 3 diagramas; `.nvmrc` (`278b643`).
+- **Pruebas:** copia limpia → npm ci, typecheck, 258/258, demo 6/6, build; Bun 1.4.4 (binario oficial en carpeta temporal) → install + demo exit 0, salida determinista.
+- **Pendiente exacto:** push del usuario; humo en Railway con Gemini (sol-001 directo, sol-004 confirmación, sol-002/003 bloqueo, sol-005 retroactiva); zip.
 
 ### 23:20 · B1 cerrada, B2 lanzada · ORQ
 - **Hecho:** PRD real leído (cambia el diseño: 5 herramientas `oc_*` con `execute → string`, RC1–RC10, confirmación conversacional con sesiones, SAP en archivos, 12 secciones de SOLUCION, bonus `modulo/`). Contratos en `src/domain/contratos-oc.ts`; fixtures reales en `fixtures/reto-03`; `test/core/casos.esperados.ts`; pdf-lib 1.17.1 y read-excel-file 9.3.14 con OK del usuario (`npm audit`: 0). Vercel retirado. Commit `6850373`, test 188/188.
