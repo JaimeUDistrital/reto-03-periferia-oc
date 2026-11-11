@@ -1,97 +1,60 @@
 /**
- * Parsers deterministas (regex) de cotizacion.txt y factura.txt.
- * Regla: un campo ausente o ilegible es `null`; nunca se lanza excepción.
- * El texto es un dato no confiable: solo se extraen campos por etiqueta, nada se interpreta.
+ * Parsers de cotizacion.txt y factura.txt (PRD §7.1). El texto es un dato no confiable:
+ * solo se extraen campos por etiqueta. Un total ilegible lanza ErrorEntrada (→ ENTRADA_INVALIDA).
  */
-import type { Cotizacion, Factura } from "../domain/modelo";
+import { ErrorEntrada, type Cotizacion, type Factura } from "../domain/tipos";
+import { normalizarNit, parsearMonto, sumarDias } from "../domain/texto";
 
-/** Fecha ISO (aaaa-mm-dd) o dd/mm/aaaa → ISO; null si no hay fecha o no existe en el calendario. */
-export function parsearFecha(texto: string): string | null {
-  const iso = /\b(\d{4})-(\d{2})-(\d{2})\b/.exec(texto);
-  const latino = /\b(\d{2})\/(\d{2})\/(\d{4})\b/.exec(texto);
-  const [anio, mes, dia] = iso
-    ? [iso[1], iso[2], iso[3]]
-    : latino
-      ? [latino[3], latino[2], latino[1]]
-      : [undefined, undefined, undefined];
-  if (anio === undefined || mes === undefined || dia === undefined) return null;
+const SUGERENCIA_ADJUNTO = "Pide al solicitante que reenvíe el documento original (PDF) para volver a normalizarlo.";
 
-  const fecha = new Date(Date.UTC(Number(anio), Number(mes) - 1, Number(dia)));
-  const existe =
-    fecha.getUTCFullYear() === Number(anio) &&
-    fecha.getUTCMonth() === Number(mes) - 1 &&
-    fecha.getUTCDate() === Number(dia);
-  return existe ? `${anio}-${mes}-${dia}` : null;
-}
-
-/**
- * Monto es-CO ("$ 1.234.567,89", "$ 11.900.000") o simple ("1234567.89").
- * Ambigüedad conocida: "1.234" (un punto y 3 dígitos) se lee como miles (1234).
- */
-export function parsearMonto(texto: string): number | null {
-  const token = /\d[\d.,]*/.exec(texto)?.[0]?.replace(/[.,]+$/, "");
-  if (token === undefined) return null;
-
-  let normalizado: string;
-  if (token.includes(",")) normalizado = token.replace(/\./g, "").replace(",", ".");
-  else if (/^\d{1,3}(\.\d{3})+$/.test(token)) normalizado = token.replace(/\./g, "");
-  else normalizado = token;
-
-  const valor = Number(normalizado);
-  return Number.isFinite(valor) ? valor : null;
-}
-
-/** "900.123.456-7" → "900123456-7". */
-export function normalizarNit(nit: string): string {
-  return nit.replace(/[.\s]/g, "");
-}
-
-/** Busca "NIT: …" en el texto. */
-export function extraerNit(texto: string): string | null {
-  const bruto = /\bNIT\b[\s:.]*(\d[\d.]*(?:-\d)?)/i.exec(texto)?.[1];
-  return bruto === undefined ? null : normalizarNit(bruto);
-}
-
-/** Valor de la primera línea con la etiqueta dada (regex sin anclas; se ancla al inicio de línea). */
-function valorDeLinea(texto: string, etiqueta: string): string | null {
+function lineaConEtiqueta(texto: string, etiqueta: string): string | null {
   const m = new RegExp(`^[ \\t]*${etiqueta}[ \\t]*:[ \\t]*(.+?)[ \\t]*$`, "im").exec(texto);
   return m?.[1] ?? null;
 }
 
-function montoDeLinea(texto: string, etiqueta: string): number | null {
-  const valor = valorDeLinea(texto, etiqueta);
-  return valor === null ? null : parsearMonto(valor);
+/** Lee «TOTAL…: COP 11.400.000» → { total, moneda }; lanza ErrorEntrada si falta o no es numérico. */
+function leerTotal(texto: string, archivo: string): { total: number; moneda: string } {
+  const valor = lineaConEtiqueta(texto, "TOTAL[^:\\n]*");
+  if (valor === null) throw new ErrorEntrada(`${archivo}: no se encontró la línea TOTAL.`, SUGERENCIA_ADJUNTO);
+  const m = /^(?:(COP|USD)\s+)?(.+)$/i.exec(valor);
+  const total = parsearMonto(m?.[2] ?? "");
+  if (total === null) {
+    throw new ErrorEntrada(`${archivo}: el TOTAL «${valor}» no es un monto numérico.`, SUGERENCIA_ADJUNTO);
+  }
+  return { total, moneda: (m?.[1] ?? "COP").toUpperCase() };
 }
 
-function fechaDeLinea(texto: string): string | null {
-  const valor = valorDeLinea(texto, "fecha(?:[ \\t]+de[ \\t]+[\\wáéíóú]+)?");
-  return valor === null ? null : parsearFecha(valor);
+function leerNit(texto: string): string | null {
+  const bruto = /^[ \t]*NIT[ \t]*:[ \t]*([\d.]+(?:-\d)?)/im.exec(texto)?.[1];
+  return bruto === undefined ? null : normalizarNit(bruto);
 }
 
-function codigoDeLinea(texto: string, etiqueta: string): string | null {
-  const valor = valorDeLinea(texto, etiqueta);
-  return valor?.match(/^[A-Za-z0-9_-]+/)?.[0] ?? null;
+function leerFechaEtiquetada(texto: string, etiqueta: string): string | null {
+  const valor = lineaConEtiqueta(texto, etiqueta);
+  return valor === null ? null : (/\d{4}-\d{2}-\d{2}/.exec(valor)?.[0] ?? null);
 }
 
 export function parsearCotizacion(texto: string): Cotizacion {
+  const { total, moneda } = leerTotal(texto, "cotizacion.txt");
+  const fecha = leerFechaEtiquetada(texto, "Fecha");
+  const dias = /^[ \t]*Validez[^:\n]*:[ \t]*(\d+)\s*d[ií]as/im.exec(texto)?.[1];
   return {
-    proveedor: valorDeLinea(texto, "(?:proveedor|raz[oó]n social)"),
-    nit: extraerNit(texto),
-    fecha: fechaDeLinea(texto),
-    subtotal: montoDeLinea(texto, "subtotal"),
-    impuesto: montoDeLinea(texto, "(?:iva|impuesto)[^:\\n]*"),
-    total: montoDeLinea(texto, "total(?:[ \\t]+a[ \\t]+pagar)?"),
-    condicionPago: codigoDeLinea(texto, "condici[oó]n(?:es)?[ \\t]+de[ \\t]+pago"),
-    indicadorIva: codigoDeLinea(texto, "indicador[ \\t]+(?:de[ \\t]+)?iva"),
+    proveedor: lineaConEtiqueta(texto, "Proveedor") ?? "",
+    nit: leerNit(texto),
+    total,
+    moneda,
+    validez_hasta: fecha !== null && dias !== undefined ? sumarDias(fecha, Number(dias)) : null,
+    texto,
+    referencia: /^[ \t]*COTIZACI[ÓO]N[ \t]+(\S+)/im.exec(texto)?.[1] ?? null,
   };
 }
 
 export function parsearFactura(texto: string): Factura {
-  const numero = /^[ \t]*factura[ \t]*(?:electr[oó]nica)?[ \t]*(?:n[oº°]\.?|#|n[uú]mero)?[ \t]*[:\-]?[ \t]*([A-Z0-9][A-Z0-9-]*)/im.exec(texto)?.[1];
-  return {
-    numero: numero ?? null,
-    fecha: fechaDeLinea(texto),
-    nit: extraerNit(texto),
-    total: montoDeLinea(texto, "total(?:[ \\t]+a[ \\t]+pagar)?"),
-  };
+  const { total } = leerTotal(texto, "factura.txt");
+  const numero = /\bNo\.?[ \t]*([A-Z0-9][A-Z0-9-]*)/.exec(texto)?.[1];
+  const fecha = leerFechaEtiquetada(texto, "Fecha[^:\\n]*");
+  if (numero === undefined || fecha === null) {
+    throw new ErrorEntrada("factura.txt: faltan el número o la fecha de emisión.", SUGERENCIA_ADJUNTO);
+  }
+  return { numero, fecha, total };
 }

@@ -1,132 +1,73 @@
 /**
- * Núcleo de órdenes de compra: herramientas (ToolDef con Zod) sobre el dominio determinista.
- * El LLM solo pasa `{ solicitudId }`; los documentos los lee el servidor, nunca el modelo.
+ * Herramientas de órdenes de compra (PRD §6.2). El servidor registra cada export como `oc_<export>`.
+ * Solo se exportan herramientas; la lógica vive en src/domain y src/data. Las herramientas nunca lanzan
+ * ni ejecutan comandos de shell, y siempre releen la fuente por `caso`.
  */
 import * as z from "zod";
-import { cargarExpediente, listarSolicitudIds } from "../data/cargador";
+import { leerExcel } from "../data/excel";
+import type { HerramientaOC } from "../domain/contratos-oc";
+import { protegido, ok } from "../domain/respuesta";
 import {
-  DictamenSchema,
-  ResultadoControlSchema,
-  type NucleoOC,
-  type OrdenCompra,
-  type ResultadoControl,
-  type ToolDef,
-} from "../domain/contratos";
-import { CONTROLES } from "../domain/controles";
-import { evaluarExpediente, evaluarSolicitud } from "../domain/evaluar";
-import { SolicitudIdSchema } from "../domain/modelo";
-import { crearSapSimulado } from "../sap/simulador";
+  construirPayloadCaso,
+  crearCaso,
+  generarEvidenciaCaso,
+  leerPaqueteCaso,
+  validarCaso,
+} from "../domain/servicio-oc";
 
-// Funciones puras reutilizables (demo.ts, tests).
-export { evaluarExpediente, evaluarSolicitud, listarSolicitudIds as listarSolicitudes };
+const caso = z.string().describe("Nombre de la carpeta del caso en fixtures/reto-03/solicitudes/, por ejemplo sol-004");
+const suelto = (texto: string) => z.record(z.string(), z.unknown()).optional().describe(texto);
 
-const EntradaSolicitudSchema = z.strictObject({
-  solicitudId: SolicitudIdSchema.describe("Identificador de la solicitud, por ejemplo sol-001"),
-});
-type EntradaSolicitud = z.infer<typeof EntradaSolicitudSchema>;
+const argsLeerPaquete = { caso };
+export const leer_paquete: HerramientaOC<typeof argsLeerPaquete> = {
+  description: "Lee y normaliza el paquete de un caso (correo, solicitud, cotización, aprobación, factura) e informa los adjuntos que faltan.",
+  args: argsLeerPaquete,
+  execute: (args, ctx) => protegido(() => leerPaqueteCaso(ctx, args.caso)),
+};
 
-const OrdenCompraSchema = z.object({
-  numero: z.string(),
-  solicitudId: z.string(),
-  creadaEn: z.string(),
-});
+const argsValidar = {
+  caso,
+  paquete: suelto("Opcional: el paquete tal como lo devolvió oc_leer_paquete; se contrasta con la fuente, no se usa como dato"),
+};
+export const validar: HerramientaOC<typeof argsValidar> = {
+  description: "Aplica las reglas de control RC1 a RC10 a un caso y devuelve si es apta, los bloqueos, las confirmaciones y los valores derivados de maestros.",
+  args: argsValidar,
+  execute: (args, ctx) => protegido(() => validarCaso(ctx, args.caso, args.paquete)),
+};
 
-/** Evalúa un solo control sobre una solicitud. */
-export async function evaluarControl(controlId: string, solicitudId: string, raizFixtures?: string): Promise<ResultadoControl> {
-  const control = CONTROLES.find((c) => c.id === controlId);
-  if (!control) throw new Error(`Control desconocido: ${controlId}`);
-  return control.evaluar(await cargarExpediente(solicitudId, raizFixtures));
-}
+const argsConstruir = {
+  caso,
+  paquete: suelto("Opcional: el paquete de oc_leer_paquete; se contrasta con la fuente"),
+  derivados: suelto("Opcional: los derivados de oc_validar; se contrastan con la fuente"),
+};
+export const construir_payload: HerramientaOC<typeof argsConstruir> = {
+  description: "Construye la orden de compra tal como quedaría en SAP, valida su esquema y guarda la trazabilidad de cada campo en out/<caso>/trazabilidad.json.",
+  args: argsConstruir,
+  execute: (args, ctx) => protegido(() => construirPayloadCaso(ctx, args.caso, args.paquete, args.derivados)),
+};
 
-export function crearNucleoOC(opciones: { raizFixtures?: string } = {}): NucleoOC {
-  const raiz = opciones.raizFixtures;
-  const sap = crearSapSimulado();
+const argsEvidencia = { caso };
+export const generar_evidencia: HerramientaOC<typeof argsEvidencia> = {
+  description: "Genera la evidencia de aprobación del caso (aprobacion.txt con su sha256 y aprobacion.pdf) en out/<caso>/.",
+  args: argsEvidencia,
+  execute: (args, ctx) => protegido(() => generarEvidenciaCaso(ctx, args.caso)),
+};
 
-  const toolControl = (nombre: string, controlId: string, descripcion: string): ToolDef<EntradaSolicitud, ResultadoControl> => ({
-    nombre,
-    descripcion,
-    entrada: EntradaSolicitudSchema,
-    salida: ResultadoControlSchema,
-    requiereConfirmacion: false,
-    ejecutar: ({ solicitudId }) => evaluarControl(controlId, solicitudId, raiz),
-  });
+const argsCrear = {
+  caso,
+  payload: suelto("Opcional: la orden de oc_construir_payload; se contrasta con la fuente y la herramienta reconstruye la orden"),
+  confirmado: z.boolean().optional().describe("true solo si el analista confirmó explícitamente este caso en su último mensaje"),
+};
+export const crear: HerramientaOC<typeof argsCrear> = {
+  description:
+    "Crea la orden de compra en el SAP simulado si el caso es apto y, cuando hay confirmaciones, el analista las confirmó; es idempotente por solicitud y registra cada intento en out/control.csv.",
+  args: argsCrear,
+  execute: (args, ctx) => protegido(() => crearCaso(ctx, args.caso, args.payload, args.confirmado)),
+};
 
-  const listar: ToolDef<Record<string, never>, { solicitudes: string[] }> = {
-    nombre: "listarSolicitudes",
-    descripcion:
-      "Lista los identificadores de las solicitudes de compra disponibles (formato sol-001). Úsala cuando el usuario no indique qué solicitud revisar.",
-    entrada: z.strictObject({}),
-    salida: z.object({ solicitudes: z.array(z.string()) }),
-    requiereConfirmacion: false,
-    ejecutar: async () => ({ solicitudes: await listarSolicitudIds(raiz) }),
-  };
-
-  const evaluar: ToolDef<EntradaSolicitud, z.infer<typeof DictamenSchema>> = {
-    nombre: "evaluarSolicitud",
-    descripcion:
-      "Ejecuta todos los controles de una solicitud y devuelve el dictamen oficial (decisión APROBABLE, REQUIERE_REVISION o RECHAZADA, resultado de cada control y hash). La decisión la calcula el sistema, no el modelo: explícala, no la cambies.",
-    entrada: EntradaSolicitudSchema,
-    salida: DictamenSchema,
-    requiereConfirmacion: false,
-    ejecutar: ({ solicitudId }) => evaluarSolicitud(solicitudId, raiz),
-  };
-
-  const crear: ToolDef<EntradaSolicitud, OrdenCompra> = {
-    nombre: "crearOrdenCompra",
-    descripcion:
-      "Crea la orden de compra en SAP para una solicitud. Requiere confirmación humana explícita: solo se ejecuta con un token de confirmación válido. Reevalúa la solicitud y se niega si está RECHAZADA. Es idempotente: repetirla devuelve la misma orden.",
-    entrada: EntradaSolicitudSchema,
-    salida: OrdenCompraSchema,
-    requiereConfirmacion: true,
-    async ejecutar({ solicitudId }) {
-      const dictamen = await evaluarSolicitud(solicitudId, raiz);
-      if (dictamen.decision === "RECHAZADA") {
-        throw new Error(`No se puede crear la orden: la solicitud ${solicitudId} está RECHAZADA.`);
-      }
-      return sap.crearOrdenCompra(solicitudId, dictamen);
-    },
-  };
-
-  const herramientas: ToolDef[] = [
-    listar,
-    toolControl(
-      "validarProveedor",
-      "CTRL-PROVEEDOR",
-      "Verifica que el proveedor de la solicitud exista en el maestro de proveedores y esté activo (no inactivo ni bloqueado). Devuelve estado OK o BLOQUEO con el motivo.",
-    ),
-    toolControl(
-      "validarCentroCostoYTope",
-      "CTRL-CECO-TOPE",
-      "Verifica que el centro de costo exista, que la aprobación la haya dado el líder de ese centro, que esté aprobada y que el total no supere el tope del líder. Devuelve OK o BLOQUEO.",
-    ),
-    toolControl(
-      "validarIVA",
-      "CTRL-IVA",
-      "Verifica el indicador de IVA y la aritmética de la cotización: impuesto = subtotal × tasa y total = subtotal + impuesto (tolerancia de 1 unidad monetaria). Devuelve OK o ALERTA.",
-    ),
-    toolControl(
-      "validarCondicionPago",
-      "CTRL-COND-PAGO",
-      "Verifica que la condición de pago exista en el maestro y coincida con la del proveedor o la de la cotización. Devuelve OK o ALERTA.",
-    ),
-    toolControl(
-      "detectarCompraRetroactiva",
-      "CTRL-RETROACTIVA",
-      "Detecta compras retroactivas: si existe una factura con fecha anterior a la solicitud o a su aprobación, devuelve BLOQUEO con las fechas como evidencia. Sin factura, devuelve OK.",
-    ),
-    toolControl(
-      "validarCoherencia",
-      "CTRL-COHERENCIA",
-      "Verifica que el proveedor (NIT) y el total de la solicitud coincidan con los de la cotización. Devuelve OK o ALERTA.",
-    ),
-    evaluar,
-    crear,
-  ];
-
-  return {
-    listarSolicitudes: () => listarSolicitudIds(raiz),
-    evaluarSolicitud: (solicitudId) => evaluarSolicitud(solicitudId, raiz),
-    herramientas,
-    sap,
-  };
-}
+const argsExcel = { ruta: z.string().describe("Ruta relativa a un .xlsx dentro de fixtures/, por ejemplo fixtures/reto-03/solicitudes/sol-001/solicitud.xlsx") };
+export const leer_excel: HerramientaOC<typeof argsExcel> = {
+  description: "Lee la primera hoja de un archivo .xlsx de fixtures/ y devuelve sus filas.",
+  args: argsExcel,
+  execute: (args, ctx) => protegido(async () => ok({ filas: await leerExcel(ctx.directory, args.ruta) })),
+};
