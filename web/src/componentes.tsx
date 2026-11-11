@@ -1,8 +1,19 @@
 import { useState } from "react";
-import type { Decision, Dictamen, EstadoControl, OrdenCompra } from "../../src/domain/contratos";
-import type { Confirmacion } from "./estado";
-import type { ItemTool } from "./vista";
-import { etiquetaTool, limpiarMarkdown, resumenControles, resumenHerramientas } from "./vista";
+import type { Hallazgo, OrdenCompra, Validacion } from "../../src/domain/contratos-oc";
+import type { Confirmacion, OcCreadaCaso } from "./estado";
+import type { EstadoValidacion, ItemTool } from "./vista";
+import {
+  argumentosCompactos,
+  estadoValidacion,
+  etiquetaTool,
+  formatearMonto,
+  formatearNumero,
+  formatearValor,
+  limpiarMarkdown,
+  resumenHerramientas,
+  resumenResultado,
+  totalOrden,
+} from "./vista";
 
 // Clases completas (Tailwind no detecta nombres armados dinámicamente).
 const foco = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento";
@@ -16,15 +27,13 @@ interface Tono {
   icono: string;
   clase: string;
 }
-const TONO_CONTROL: Record<EstadoControl, Tono> = {
-  OK: { texto: "En orden", icono: "✓", clase: "bg-ok-suave text-ok" },
-  ALERTA: { texto: "Alerta", icono: "!", clase: "bg-alerta-suave text-alerta" },
-  BLOQUEO: { texto: "Bloquea", icono: "✕", clase: "bg-bloqueo-suave text-bloqueo" },
-};
-const TONO_DECISION: Record<Decision, Tono> = {
-  APROBABLE: { ...TONO_CONTROL.OK, texto: "Aprobable" },
-  REQUIERE_REVISION: { ...TONO_CONTROL.ALERTA, texto: "Requiere revisión" },
-  RECHAZADA: { ...TONO_CONTROL.BLOQUEO, texto: "Rechazada" },
+const TONO_OK: Tono = { texto: "En orden", icono: "✓", clase: "bg-ok-suave text-ok" };
+const TONO_ALERTA: Tono = { texto: "Alerta", icono: "!", clase: "bg-alerta-suave text-alerta" };
+const TONO_BLOQUEO: Tono = { texto: "Bloquea", icono: "✕", clase: "bg-bloqueo-suave text-bloqueo" };
+const TONO_VALIDACION: Record<EstadoValidacion, Tono> = {
+  apta: { ...TONO_OK, texto: "Apta" },
+  confirmacion: { ...TONO_ALERTA, texto: "Requiere confirmación" },
+  bloqueada: { ...TONO_BLOQUEO, texto: "Bloqueada" },
 };
 
 function Icono({ tono }: { tono: Tono }) {
@@ -35,8 +44,8 @@ function Icono({ tono }: { tono: Tono }) {
   );
 }
 
-export function Insignia({ decision }: { decision: Decision }) {
-  const tono = TONO_DECISION[decision];
+export function Insignia({ estado }: { estado: EstadoValidacion }) {
+  const tono = TONO_VALIDACION[estado];
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-semibold ${tono.clase}`}>
       <span aria-hidden="true">{tono.icono}</span>
@@ -53,18 +62,27 @@ const aTexto = (v: unknown): string => {
   }
 };
 
+// ── Herramientas ───────────────────────────────────────────────────────────
+
 function FilaHerramienta({ tool }: { tool: ItemTool }) {
   const r = tool.resultado;
-  const tono: Tono = !r ? { texto: "En curso", icono: "…", clase: "bg-lienzo text-tenue" } : r.ok ? TONO_CONTROL.OK : { ...TONO_CONTROL.BLOQUEO, texto: "Error" };
+  const tono: Tono = !r ? { texto: "En curso", icono: "…", clase: "bg-lienzo text-tenue" } : r.ok ? TONO_OK : { ...TONO_BLOQUEO, texto: "Error" };
+  const args = argumentosCompactos(tool.entrada);
   return (
     <li>
       <details className="group">
-        <summary className={`flex cursor-pointer list-none items-center gap-2 rounded px-2 py-1.5 hover:bg-lienzo ${foco}`}>
-          <Icono tono={tono} />
-          <span className="sr-only">{tono.texto}:</span>
-          <span className="text-sm">{etiquetaTool(tool.nombre)}</span>
-          <code translate="no" className="hidden truncate text-xs text-tenue sm:inline">{tool.nombre}</code>
-          {r && <span className="ml-auto text-xs tabular-nums text-tenue">{r.ms} ms</span>}
+        <summary className={`cursor-pointer list-none rounded px-2 py-1.5 hover:bg-lienzo ${foco}`}>
+          <span className="flex items-center gap-2">
+            <Icono tono={tono} />
+            <span className="sr-only">{tono.texto}:</span>
+            <span className="text-sm">{etiquetaTool(tool.nombre)}</span>
+            <code translate="no" className="truncate text-xs text-tenue">{tool.nombre}</code>
+            {r && <span className="ml-auto text-xs tabular-nums text-tenue">{r.ms} ms</span>}
+          </span>
+          <span className="mt-0.5 ml-7 block text-xs text-tenue">
+            {args && <code translate="no" className="mr-2 break-words">{args}</code>}
+            {r && <span className="font-medium text-tinta">{resumenResultado(tool.nombre, r.ok, r.salida)}</span>}
+          </span>
         </summary>
         <div className="mt-1 mb-2 ml-9 space-y-2 text-xs">
           <p className="text-tenue">Entrada</p>
@@ -96,18 +114,31 @@ export function BloqueHerramientas({ tools }: { tools: ItemTool[] }) {
   );
 }
 
-export function ListaControles({ dictamen }: { dictamen: Dictamen }) {
+// ── Hallazgos (bloqueos y confirmaciones) ──────────────────────────────────
+
+function ListaHallazgos({ hallazgos, tono }: { hallazgos: Hallazgo[]; tono: Tono }) {
   return (
     <ul className="space-y-3">
-      {dictamen.controles.map((c) => (
-        <li key={c.id} className="flex gap-2.5">
-          <Icono tono={TONO_CONTROL[c.estado]} />
-          <div className="min-w-0">
+      {hallazgos.map((h, i) => (
+        <li key={`${h.regla}-${i}`} className="flex gap-2.5">
+          <Icono tono={tono} />
+          <div className="min-w-0 space-y-1">
             <p className="text-sm font-medium">
-              {c.nombre}
-              <span className="sr-only">: {TONO_CONTROL[c.estado].texto}</span>
+              <span translate="no" className="mr-1.5 rounded border border-linea px-1.5 py-0.5 font-mono text-xs">{h.regla}</span>
+              <span className="sr-only">{tono.texto}: </span>
+              {h.detalle}
             </p>
-            <p className="text-sm text-tenue">{c.detalle}</p>
+            {h.valores && Object.keys(h.valores).length > 0 && (
+              <dl className="flex flex-wrap gap-x-4 gap-y-0.5 text-sm tabular-nums">
+                {Object.entries(h.valores).map(([k, v]) => (
+                  <div key={k} className="flex gap-1.5">
+                    <dt className="text-tenue">{k}:</dt>
+                    <dd className="font-medium">{formatearValor(v)}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            <p className="text-sm text-tenue">{h.accion_sugerida}</p>
           </div>
         </li>
       ))}
@@ -115,63 +146,192 @@ export function ListaControles({ dictamen }: { dictamen: Dictamen }) {
   );
 }
 
-export function PanelResultado({ dictamen, orden }: { dictamen: Dictamen | null; orden: OrdenCompra | null }) {
-  const ordenDeEsta = orden && dictamen && orden.solicitudId === dictamen.solicitudId ? orden : null;
+// ── Orden de compra «como quedaría en SAP» ─────────────────────────────────
+
+function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-3 text-sm">
+      <dt className="shrink-0 text-tenue">{etiqueta}</dt>
+      <dd className="min-w-0 text-right break-words">{children}</dd>
+    </div>
+  );
+}
+
+export function TablaOrden({ orden }: { orden: OrdenCompra }) {
+  return (
+    <section aria-labelledby="titulo-orden" className="space-y-3">
+      <h3 id="titulo-orden" className="text-sm font-semibold text-tenue">
+        OC como quedaría en SAP
+      </h3>
+      <dl className="space-y-1">
+        <Dato etiqueta="Proveedor">
+          <span translate="no">{orden.proveedor.nombre}</span>
+        </Dato>
+        <Dato etiqueta="NIT">
+          <span translate="no" className="tabular-nums">{orden.proveedor.nit}</span>
+        </Dato>
+        <Dato etiqueta="Código SAP">
+          <span translate="no" className="tabular-nums">{orden.proveedor.codigo_sap}</span>
+        </Dato>
+        <Dato etiqueta="Moneda">{orden.moneda}</Dato>
+        <Dato etiqueta="Condiciones de pago">
+          <span translate="no">{orden.condiciones_pago}</span>
+        </Dato>
+        <Dato etiqueta="Aprobador">
+          <span translate="no">{orden.aprobador.email}</span>
+          <span className="block text-xs text-tenue">{orden.aprobador.fecha_aprobacion}</span>
+        </Dato>
+      </dl>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <caption className="sr-only">Posiciones de la orden de compra</caption>
+          <thead>
+            <tr className="border-b border-linea text-xs text-tenue">
+              <th scope="col" className="py-1 pr-2 font-medium">Posición</th>
+              <th scope="col" className="py-1 pr-2 text-right font-medium">Cant.</th>
+              <th scope="col" className="py-1 text-right font-medium">Precio unit.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orden.posiciones.map((p) => (
+              <tr key={p.numero} className="border-b border-linea align-top last:border-0">
+                <td className="py-1.5 pr-2">
+                  <span className="font-medium">
+                    <span className="tabular-nums text-tenue">{p.numero}</span> {p.descripcion}
+                  </span>
+                  <span translate="no" className="block text-xs text-tenue">
+                    {p.centro_costo} · {p.subarea} · IVA {p.indicador_iva}
+                  </span>
+                </td>
+                <td className="py-1.5 pr-2 text-right tabular-nums">
+                  {formatearNumero(p.cantidad)} {p.unidad}
+                </td>
+                <td className="py-1.5 text-right tabular-nums">{formatearNumero(p.precio_unitario)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="flex justify-between text-sm font-semibold tabular-nums">
+        <span>Total</span>
+        <span>{formatearMonto(totalOrden(orden), orden.moneda)}</span>
+      </p>
+      {orden.excepciones.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-tenue">Excepciones</p>
+          <ul className="space-y-1 text-sm">
+            {orden.excepciones.map((x, i) => (
+              <li key={`${x.codigo}-${i}`}>
+                <span translate="no" className="mr-1.5 rounded border border-linea px-1.5 py-0.5 font-mono text-xs">{x.codigo}</span>
+                {x.detalle}
+                <span className="block text-xs text-tenue">{x.confirmado_por ? `Confirmada por ${x.confirmado_por}` : "Pendiente de confirmación"}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ── Panel lateral ──────────────────────────────────────────────────────────
+
+function CartelOc({ oc }: { oc: OcCreadaCaso }) {
+  return (
+    <section aria-labelledby="titulo-oc" className="space-y-1 rounded-md bg-ok-suave px-3 py-3 text-ok">
+      <h3 id="titulo-oc" className="text-xs font-medium">
+        Orden de compra creada{oc.idempotente ? " · ya existía" : ""}
+      </h3>
+      <p className="text-3xl font-semibold tabular-nums">{oc.numero_oc}</p>
+      <p className="text-sm tabular-nums">{oc.fecha}</p>
+      {oc.evidencia && (
+        <p className="text-xs break-all">
+          Evidencia: <span translate="no" className="font-mono">{oc.evidencia}</span>
+        </p>
+      )}
+      {oc.retroactiva && <p className="text-xs font-medium">Compra retroactiva</p>}
+    </section>
+  );
+}
+
+export function PanelResultado({ validacion, orden, ocCreada }: { validacion: Validacion | null; orden: OrdenCompra | null; ocCreada: OcCreadaCaso | null }) {
   return (
     <aside aria-labelledby="titulo-resultado" className="rounded-lg border border-linea bg-papel p-4 lg:overflow-y-auto">
       <h2 id="titulo-resultado" className="text-sm font-semibold text-tenue">
         Resultado de la revisión
       </h2>
-      {!dictamen ? (
-        <p className="mt-3 text-sm text-tenue">Cuando revises una solicitud, aquí verás cada control y si está en orden.</p>
+      {!validacion ? (
+        <p className="mt-3 text-sm text-tenue">Cuando revises un caso, aquí verás si está apta, qué bloquea o qué debes confirmar, y la OC tal como quedaría en SAP.</p>
       ) : (
         <div className="mt-3 space-y-4">
           <div className="space-y-2">
-            <p className="text-lg font-semibold" translate="no">{dictamen.solicitudId}</p>
-            <Insignia decision={dictamen.decision} />
-            <p className="text-sm text-tenue tabular-nums">{resumenControles(dictamen)}</p>
+            <p className="text-lg font-semibold" translate="no">{validacion.caso}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Insignia estado={estadoValidacion(validacion)} />
+              {validacion.retroactiva && (
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-semibold ${TONO_ALERTA.clase}`}>
+                  <span aria-hidden="true">!</span>Compra retroactiva
+                </span>
+              )}
+            </div>
           </div>
-          {ordenDeEsta && (
-            <p className="rounded-md bg-ok-suave px-3 py-2 text-sm text-ok">
-              Orden de compra <span className="font-semibold tabular-nums">{ordenDeEsta.numero}</span>
-            </p>
+          {ocCreada && ocCreada.caso === validacion.caso && <CartelOc oc={ocCreada} />}
+          {validacion.bloqueos.length > 0 && (
+            <section aria-labelledby="titulo-bloqueos" className="space-y-2">
+              <h3 id="titulo-bloqueos" className="text-sm font-semibold text-tenue">Bloqueos</h3>
+              <ListaHallazgos hallazgos={validacion.bloqueos} tono={TONO_BLOQUEO} />
+            </section>
           )}
-          <ListaControles dictamen={dictamen} />
-          <details className="text-xs text-tenue">
-            <summary className={`cursor-pointer ${foco}`}>Detalles técnicos</summary>
-            <p className="mt-1 break-all font-mono" translate="no">Huella del dictamen: {dictamen.hash}</p>
-          </details>
+          {validacion.confirmaciones.length > 0 && (
+            <section aria-labelledby="titulo-confirmaciones" className="space-y-2">
+              <h3 id="titulo-confirmaciones" className="text-sm font-semibold text-tenue">Confirmaciones</h3>
+              <ListaHallazgos hallazgos={validacion.confirmaciones} tono={TONO_ALERTA} />
+            </section>
+          )}
+          {validacion.bloqueos.length === 0 && validacion.confirmaciones.length === 0 && (
+            <p className="text-sm text-tenue">Sin bloqueos ni confirmaciones pendientes.</p>
+          )}
+          {Object.keys(validacion.derivados).length > 0 && (
+            <section aria-labelledby="titulo-derivados" className="space-y-1">
+              <h3 id="titulo-derivados" className="text-sm font-semibold text-tenue">Completado desde maestros</h3>
+              <dl className="space-y-1">
+                {Object.entries(validacion.derivados).map(([k, v]) => (
+                  <Dato key={k} etiqueta={k}>
+                    <span translate="no">{v}</span>
+                  </Dato>
+                ))}
+              </dl>
+            </section>
+          )}
+          {orden && orden.referencia.solicitud_id === validacion.solicitud_id && <TablaOrden orden={orden} />}
         </div>
       )}
     </aside>
   );
 }
 
-type Accion = "aprobar" | "rechazar";
+// ── Decisión humana (CA3) ──────────────────────────────────────────────────
 
-export function TarjetaDecision({ confirmacion, onDecidir }: { confirmacion: Confirmacion; onDecidir: (accion: Accion) => void }) {
-  const [elegida, setElegida] = useState<Accion | null>(null);
-  const decidir = (accion: Accion) => {
+export function TarjetaDecision({ confirmacion, onConfirmar, onRechazar }: { confirmacion: Confirmacion; onConfirmar: () => void; onRechazar: () => void }) {
+  const [elegida, setElegida] = useState<"si" | "no" | null>(null);
+  const decidir = (cual: "si" | "no") => {
     if (elegida) return;
-    setElegida(accion);
-    onDecidir(accion);
+    setElegida(cual);
+    (cual === "si" ? onConfirmar : onRechazar)();
   };
-  const d = confirmacion.dictamen;
   return (
     <section aria-labelledby="titulo-decision" className="space-y-3 rounded-lg border-2 border-acento bg-acento-suave p-4">
       <h3 id="titulo-decision" className="font-semibold">
-        Tu decisión sobre <span translate="no">{confirmacion.solicitudId}</span>
+        Tu decisión sobre <span translate="no">{confirmacion.caso}</span>
       </h3>
-      <div className="flex flex-wrap items-center gap-2">
-        <Insignia decision={d.decision} />
-        <span className="text-sm tabular-nums">{resumenControles(d)}</span>
-      </div>
-      <p className="text-sm text-tenue">Si confirmas, se crea la orden de compra en SAP (simulado). Nada se crea sin tu confirmación.</p>
+      <p className="text-sm">Hay algo que solo tú puedes aceptar antes de crear la orden:</p>
+      <ListaHallazgos hallazgos={confirmacion.confirmaciones} tono={TONO_ALERTA} />
+      <p className="text-sm text-tenue">Si confirmas, se crea la OC en SAP (simulado). Nada se crea sin tu confirmación.</p>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={botonPrimario} disabled={elegida !== null} onClick={() => decidir("aprobar")}>
-          {elegida === "aprobar" ? "Creando orden…" : "Crear orden de compra"}
+        <button type="button" className={botonPrimario} disabled={elegida !== null} onClick={() => decidir("si")}>
+          {elegida === "si" ? "Creando OC…" : "Confirmar y crear OC"}
         </button>
-        <button type="button" className={botonSecundario} disabled={elegida !== null} onClick={() => decidir("rechazar")}>
+        <button type="button" className={botonSecundario} disabled={elegida !== null} onClick={() => decidir("no")}>
           No crear
         </button>
       </div>
@@ -179,19 +339,27 @@ export function TarjetaDecision({ confirmacion, onDecidir }: { confirmacion: Con
   );
 }
 
-export function AvisoOc({ orden }: { orden: OrdenCompra }) {
+// ── Chat ───────────────────────────────────────────────────────────────────
+
+export function AvisoOc({ oc }: { oc: OcCreadaCaso }) {
   return (
     <div role="status" className="rounded-lg border border-ok/30 bg-ok-suave p-4 text-ok">
-      <p className="text-sm font-medium">Orden de compra creada</p>
-      <p className="text-2xl font-semibold tabular-nums">{orden.numero}</p>
+      <p className="text-sm font-medium">{oc.idempotente ? "La orden de compra ya existía" : "Orden de compra creada"}</p>
+      <p className="text-2xl font-semibold tabular-nums">{oc.numero_oc}</p>
       <p className="text-sm">
-        Solicitud <span translate="no">{orden.solicitudId}</span> en SAP (simulado)
+        Caso <span translate="no">{oc.caso}</span> en SAP (simulado) · {oc.fecha}
       </p>
+      {oc.evidencia && (
+        <p className="text-xs break-all">
+          Evidencia: <span translate="no" className="font-mono">{oc.evidencia}</span>
+        </p>
+      )}
+      {oc.retroactiva && <p className="text-xs font-medium">Compra retroactiva</p>}
     </div>
   );
 }
 
-export function BannerError({ mensaje, correlationId }: { mensaje: string; correlationId: string }) {
+export function BannerError({ mensaje, correlationId, onReintentar }: { mensaje: string; correlationId: string; onReintentar?: () => void }) {
   return (
     <div role="alert" className="rounded-lg border border-bloqueo/30 bg-bloqueo-suave p-3 text-sm text-bloqueo">
       <p className="font-medium">No se pudo completar</p>
@@ -199,6 +367,11 @@ export function BannerError({ mensaje, correlationId }: { mensaje: string; corre
       <p className="mt-1 text-xs">
         Código de seguimiento: <span className="font-mono" translate="no">{correlationId}</span>
       </p>
+      {onReintentar && (
+        <button type="button" className={`${botonSecundario} mt-2`} onClick={onReintentar}>
+          Reintentar
+        </button>
+      )}
     </div>
   );
 }
