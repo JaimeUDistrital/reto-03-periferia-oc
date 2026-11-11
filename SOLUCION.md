@@ -1,6 +1,6 @@
 # SOLUCION · Reto 3 · Agente de Órdenes de Compra (SAP simulado)
 
-Convenciones: lo que no pude comprobar en una fuente va marcado «(no verificado)». Donde el texto depende de lo que entreguen otras partes del trabajo (núcleo, agente, UI, módulo) va un comentario `<!-- VERIFICAR -->`. Las cifras agregadas indican su población: los fixtures son 6 casos (n=6) y no son una muestra estadística.
+Convenciones: lo que no pude comprobar en una fuente va marcado «(no verificado)». Las cifras agregadas indican su población: los fixtures son 6 casos (n=6) y no son una muestra estadística.
 
 ## 1. Problema en una frase y a quién le duele
 
@@ -40,17 +40,17 @@ Dónde vive cada cosa (separación que pide el PRD §6.5):
 | Proveedor LLM | `src/llm/` | Interfaz propia y una implementación (Gemini) |
 | Sistema de registro | `src/sap/` | Interfaz `SapAdapter` (PRD §7.4) y `mock.ts` |
 
-Un cambio de reglas de negocio toca `src/tools/oc.ts` y el conocimiento, no el servidor. Un solo proceso Node sirve la API y la web compilada. `demo.ts`, el botón «Revisar sin IA» y el chat llaman a las mismas herramientas. <!-- VERIFICAR: nombres de archivos del núcleo y del servidor según el merge final -->
+Un cambio de reglas de negocio toca `src/tools/oc.ts` y el conocimiento, no el servidor. Un solo proceso Node sirve la API y la web compilada. `demo.ts`, el botón «Revisar sin IA» y el chat llaman a las mismas herramientas. `src/tools/oc.ts` es una capa fina: valida con `zod` y delega en `src/domain/` (reglas, payload, evidencia, servicio) y `src/data/` (lectura de fixtures, `control.csv`, candado); el ciclo del agente vive en `src/agent/`.
 
 ## 3. Ciclo del agente
 
 1. **Bucle.** El servidor recibe `POST /api/chat {sessionId, message, confirmar?}`, añade el mensaje a la sesión (en memoria) y llama al modelo a través del adaptador. Si el modelo pide herramientas, el servidor valida los argumentos con `zod`, las ejecuta, devuelve los resultados al modelo y repite. Cuando el modelo responde con texto, el turno termina. Cada paso sale por SSE (`tool_call`, `tool_result`, `confirmacion_requerida`, `oc_creada`, `mensaje`, `error`, `fin`) y se anota en `out/log.jsonl`.
 2. **Tope de iteraciones.** `MAX_ITERACIONES` (25, valor sugerido por el PRD CA1) corta el bucle por turno; al alcanzarlo el agente responde con lo que tiene y lo que falta.
-3. **Tope de tokens.** `MAX_TOKENS_SESION` limita el consumo acumulado de la sesión; al superarlo, el chat avisa y deja de llamar al modelo. Un visitante del link público no puede gastar la clave sin límite. <!-- VERIFICAR: valor por defecto de MAX_TOKENS_SESION y mensaje exacto -->
+3. **Tope de tokens.** `MAX_TOKENS_SESION` limita el consumo acumulado de la sesión; al superarlo, el chat avisa y deja de llamar al modelo. Por defecto 200 000 tokens; al alcanzarlo responde «Esta sesión alcanzó el límite de 200000 tokens. Abre una sesión nueva para continuar.» (`src/agent/loop.ts`). Un visitante del link público no puede gastar la clave sin límite.
 4. **Errores.** Una herramienta devuelve `{ ok: false, error }` y nunca lanza; un fallo o timeout del proveedor LLM se muestra en el chat y la sesión sigue viva (CA5).
 5. **Confirmación humana.** Cuando `oc_validar` devuelve confirmaciones (RC5, RC6, RC8, RC9), el agente termina el turno con una pregunta que muestra los valores en juego, y la UI resalta la tarjeta. `oc_crear` solo procede con `confirmado = true`.
 
-**Por qué la guardia está en el servidor y no en el prompt.** Un prompt es una petición, no una garantía: el modelo puede saltársela por un error propio o por texto malicioso dentro de un documento (inyección de instrucciones). Por eso el servidor inyecta `ctx.confirmacionHumana(caso)`, que solo devuelve `true` si el último mensaje del usuario confirmó ese caso. `oc_crear` ignora el `confirmado` que mande el modelo si esa función dice que no, y responde `CONFIRMACION_NO_HUMANA`. Además `oc_crear` reconstruye el payload desde la fuente y rechaza uno alterado (`PAYLOAD_ALTERADO`). El modelo explica y orquesta; no puede autoconfirmarse ni cambiar un monto. <!-- VERIFICAR: cómo decide el servidor que "el usuario confirmó ese caso" (campo `confirmar` de la API vs. análisis del texto) -->
+**Por qué la guardia está en el servidor y no en el prompt.** Un prompt es una petición, no una garantía: el modelo puede saltársela por un error propio o por texto malicioso dentro de un documento (inyección de instrucciones). Por eso el servidor inyecta `ctx.confirmacionHumana(caso)`, que solo devuelve `true` si el último mensaje del usuario confirmó ese caso. «Confirmó» significa una de dos cosas (`src/agent/confirmacion.ts`): el botón de la UI manda `confirmar: "sol-004"` y coincide con el caso pendiente, o el texto es una afirmación breve (≤ 200 caracteres) sin negación, sin pregunta y sin nombrar otro caso. `oc_crear` ignora el `confirmado` que mande el modelo si esa función dice que no, y responde `CONFIRMACION_NO_HUMANA`. Además `oc_crear` reconstruye el payload desde la fuente y rechaza uno alterado (`PAYLOAD_ALTERADO`). El modelo explica y orquesta; no puede autoconfirmarse ni cambiar un monto.
 
 ## 4. Elección del modelo
 
@@ -60,12 +60,13 @@ Un cambio de reglas de negocio toca `src/tools/oc.ts` y el conocimiento, no el s
 - **Costo estimado por caso procesado** (fórmula): `costo = (tokens_entrada / 1e6) × P_in + (tokens_salida / 1e6) × P_out`. Supuestos **míos, no medidos**: un caso son unas 6 llamadas al modelo con contexto creciente, 30.000 tokens de entrada acumulados y 1.500 de salida.
   - Hasta 31/12/2026: 0,03 × 0,75 + 0,0015 × 3,75 = 0,0225 + 0,0056 = **≈ 0,028 USD por caso**.
   - Desde 01/01/2027: ≈ 0,056 USD por caso.
-  - Para n=6 casos, ≈ 0,17 USD hasta fin de 2026. <!-- VERIFICAR: reemplazar los tokens supuestos por los medidos en out/log.jsonl si el agente registra el uso -->
+  - Para n=6 casos, ≈ 0,17 USD hasta fin de 2026.
+  - Los tokens por caso son **supuestos**, no medidos: el servidor suma `usageMetadata.totalTokenCount` por sesión (para el tope) pero no lo guarda en `out/log.jsonl`. Medirlo es el siguiente paso antes de presupuestar.
 - **Privacidad (comprobado: https://aistudio.google.com/docs/terms):** en el nivel gratuito Google puede usar entradas y salidas para mejorar sus productos; en el de pago, no. Los fixtures son ficticios; con datos reales se usa el nivel de pago.
 
 ## 5. Matriz de controles RC1–RC10
 
-«Casos» según el resultado esperado fijado en `test/core/casos.esperados.ts` (6 casos, n=6). La implementación es determinista (sin modelo) y vive en `oc_validar`. <!-- VERIFICAR: que los resultados de `npm run demo` coincidan con esta tabla -->
+«Casos» según el resultado esperado fijado en `test/core/casos.esperados.ts` (6 casos, n=6). La implementación es determinista (sin modelo) y vive en `oc_validar` (`src/domain/reglas.ts`). `npm run demo` termina con «OK: los 6 casos coinciden con casos.esperados.ts» (comprobado el 2026-11-10).
 
 | Regla | Tipo | Cómo se implementa | Casos que la disparan |
 |---|---|---|---|
@@ -82,7 +83,7 @@ Un cambio de reglas de negocio toca `src/tools/oc.ts` y el conocimiento, no el s
 
 Resultado por caso (n=6): sol-001 apta sin observaciones, OC `4500000001`; sol-002 bloqueada por RC1; sol-003 bloqueada por RC2; sol-004 apta con RC5; sol-005 apta con RC8 y `retroactiva`; sol-006 apta con RC6 y dos derivados. 2 de 6 se bloquean, 3 de 6 piden confirmación, 1 de 6 pasa sin intervención.
 
-**Cuatro de las diez reglas (RC3, RC4, RC9, RC10) no se disparan con los fixtures.** Están cubiertas por tests unitarios con casos construidos, no por los 6 casos del PRD. <!-- VERIFICAR: que esos tests existan en test/ -->
+**Cuatro de las diez reglas (RC3, RC4, RC9, RC10) no se disparan con los fixtures.** Están cubiertas por tests unitarios con variantes construidas de los fixtures (`test/core/reglas.test.ts`), no por los 6 casos del PRD.
 
 **La más difícil: RC2.** Mezcla tres cosas que fallan de formas distintas: leer una intención en texto libre, mapear un remitente al centro correcto y ordenar la evaluación respecto de RC3. Los fixtures traen tres redacciones de «Aprobado» («Aprobado, proceder…», «Aprobado desde comercial, es para…», «Aprobado. Ya llegó la factura…»); una búsqueda ingenua de subcadena aceptaría también «No aprobado» o «Desaprobado», así que se busca como palabra completa y sin negación delante. Y sol-003 es un caso trampa: el aprobador (fvargas) es real y su tope (80 M) cubre los 74 M, pero no es aprobador de CC-2020 (cuyo único aprobador, rtorres, tiene tope de 30 M). Si RC3 se evaluara con el tope «de la persona» en vez del «de la persona en ese centro», la OC pasaría. Por eso RC3 depende del resultado de RC2.
 
@@ -92,7 +93,7 @@ Resultado por caso (n=6): sol-001 apta sin observaciones, OC `4500000001`; sol-0
 
 **RFC con `BAPI_PO_CREATE1`**, detrás de la interfaz `SapAdapter` que ya existe, con una **fase 0** que es el plan B (sección «Plan B»). Razones, dada una viabilidad de conexión **no confirmada**:
 
-- `BAPI_PO_CREATE1` existe como función de creación de pedidos (comprobado: https://www.sapdatasheet.org/abap/func/bapi_po_create1.html). Funciona en sistemas ECC y S/4HANA on-premise. <!-- VERIFICAR: que el cliente use SAP on-premise y su versión; no lo sé -->
+- `BAPI_PO_CREATE1` existe como función de creación de pedidos (comprobado: https://www.sapdatasheet.org/abap/func/bapi_po_create1.html). Funciona en sistemas ECC y S/4HANA on-premise. Si el cliente usa SAP on-premise y qué versión, no lo sé: es la primera pregunta para el cliente.
 - OData V2 `API_PURCHASEORDER_PROCESS_SRV` está deprecado desde la versión 2308 y su sucesor es OData V4 `API_PURCHASEORDER_2`. Si el cliente está en S/4HANA reciente o Cloud, V4 sería la opción; si no, V2 muriendo no es base para construir.
 - Integration Suite añade una plataforma y una licencia que el cliente puede no tener; se descarta como primer paso, no como destino.
 - La carga por archivo no requiere conectividad y sirve de plan B.
@@ -186,8 +187,8 @@ Los que detecté al leer los fixtures:
 5. **sol-003:** el aprobador no es del centro de la solicitud, pero sí aprobador de otro (CC-3030). Se trata como bloqueo RC2, sin evaluar RC3.
 6. **sol-005:** la aprobación (28/08) es posterior a la solicitud (27/08), así que RC9 no salta; lo retroactivo lo captura RC8 por la factura (10/08). La cotización (05/08) también es anterior a la solicitud; eso no se controla.
 7. **sol-006:** no trae NIT, así que el proveedor se busca por nombre normalizado. Sin `indicador_iva` ni `condiciones_pago`, se derivan del proveedor (C1 y Z030); solo el IVA pide confirmación.
-8. **IVA incluido:** las cotizaciones dan «precio unitario (IVA incl.)» y el `valor_total` de la solicitud coincide con ese total con IVA. Se asume que `valor_unitario` y `valor_total` incluyen IVA. En SAP real `NET_PRICE` es neto (ver §6): habría que convertir con la tasa del indicador. En el mock se usa el valor tal cual. <!-- VERIFICAR: que el payload use precio_unitario de la solicitud sin quitar IVA -->
-9. **Unidad:** la solicitud no trae unidad y el payload exige `UN`, `H` o `MES`. Se asume `UN` salvo que la descripción indique horas o meses (sol-004 son horas de arquitecto). <!-- VERIFICAR: regla real del núcleo para la unidad -->
+8. **IVA incluido:** las cotizaciones dan «precio unitario (IVA incl.)» y el `valor_total` de la solicitud coincide con ese total con IVA. Se asume que `valor_unitario` y `valor_total` incluyen IVA. En SAP real `NET_PRICE` es neto (ver §6): habría que convertir con la tasa del indicador. En el mock se usa el valor tal cual: `precio_unitario` sale de `valor_unitario` de la solicitud (`src/domain/payload.ts`).
+9. **Unidad:** la solicitud no trae unidad y el payload exige `UN`, `H` o `MES`. Se asume `H` si la descripción menciona «hora» u «horas» y `UN` en otro caso (sol-004 son horas de arquitecto). `MES` no se infiere: el PRD no da un criterio fiable.
 10. **Descripción:** se trunca a 40 caracteres (límite del texto breve, PRD §7.4).
 11. **Aprobador de la OC:** el remitente de la aprobación, validado contra el centro. La aprobación en `.eml` o PDF real puede requerir firma digital (PRD §10).
 12. **Maestros completos y únicos:** el proveedor `901777888` (Consultores Ágiles) está inactivo en el maestro, pero ningún caso lo usa; RC1 lo bloquearía.
@@ -196,21 +197,21 @@ Los que detecté al leer los fixtures:
 
 | Historia | Estado | Qué falta para producción |
 |---|---|---|
-| HU-1 Leer el paquete (`oc_leer_paquete`) | Hecho <!-- VERIFICAR --> | Leer los adjuntos binarios reales (`.eml`, `.pdf`) en vez de los normalizados |
-| HU-2 Validar (`oc_validar`, RC1–RC10) | Hecho <!-- VERIFICAR --> | Maestros en vivo desde SAP, no archivos |
-| HU-3 Payload y trazabilidad (`oc_construir_payload`) | Hecho <!-- VERIFICAR --> | Datos que SAP exige y 7.4 no trae (tipo de documento, grupo de compras, centro) |
-| HU-4 Evidencia (txt + sha256) | Hecho <!-- VERIFICAR --> | Firma digital o archivo inmutable si auditoría lo pide |
-| HU-5 Crear OC (`oc_crear`, idempotencia, `control.csv`) | Hecho en SAP simulado <!-- VERIFICAR --> | Adaptador real (§6), no implementado |
-| HU-6 Errores `{ ok: false, error }` | Hecho <!-- VERIFICAR --> | Pruebas con adjuntos corruptos reales |
-| P1 PDF de evidencia (`pdf-lib` 1.17.1) | Hecho <!-- VERIFICAR --> | Adjuntarlo a la OC en SAP |
-| P1 Excel (`oc_leer_excel`, `read-excel-file` 9.3.14) | Hecho <!-- VERIFICAR --> | Mapear un `.xlsx` real al esquema de solicitud; hoy se prueba con un archivo de ejemplo |
-| Front de chat (tool calls visibles, confirmación resaltada) | Hecho <!-- VERIFICAR --> | Accesibilidad auditada, autenticación |
-| Link público (Railway) | Desplegado en la fase A; falta redesplegar la versión final <!-- VERIFICAR --> | Dominio propio, monitorización |
-| Bonus `modulo/` (agente, herramientas, skill) | <!-- VERIFICAR: hecho / parcial --> | Que `agent.md` y `skill/` se generen desde `agent/prompt.md` y `src/knowledge/` (hay un test de sincronía para que no diverjan) |
+| HU-1 Leer el paquete (`oc_leer_paquete`) | Hecho | Leer los adjuntos binarios reales (`.eml`, `.pdf`) en vez de los normalizados |
+| HU-2 Validar (`oc_validar`, RC1–RC10) | Hecho | Maestros en vivo desde SAP, no archivos |
+| HU-3 Payload y trazabilidad (`oc_construir_payload`) | Hecho | Datos que SAP exige y 7.4 no trae (tipo de documento, grupo de compras, centro) |
+| HU-4 Evidencia (txt + sha256) | Hecho | Firma digital o archivo inmutable si auditoría lo pide |
+| HU-5 Crear OC (`oc_crear`, idempotencia, `control.csv`) | Hecho en SAP simulado | Adaptador real (§6), no implementado |
+| HU-6 Errores `{ ok: false, error }` | Hecho | Pruebas con adjuntos corruptos reales |
+| P1 PDF de evidencia (`pdf-lib` 1.17.1) | Hecho (`out/<caso>/aprobacion.pdf`) | Adjuntarlo a la OC en SAP |
+| P1 Excel (`oc_leer_excel`, `read-excel-file` 9.3.14) | Parcial: la herramienta existe y rechaza rutas fuera de `fixtures/`, archivos inexistentes y rotos; no hay `.xlsx` en los fixtures, así que la lectura correcta no está probada | Un `.xlsx` real de ejemplo y su mapeo al esquema de solicitud |
+| Front de chat (tool calls visibles, confirmación resaltada) | Hecho | Accesibilidad auditada, autenticación |
+| Link público (Railway) | Desplegado en Railway (ver README) | Dominio propio, monitorización |
+| Bonus `modulo/` (agente, herramientas, skill) | Hecho: `npm run modulo` genera `agent.md` y `skill/ordenes-compra/SKILL.md` desde `agent/prompt.md` y `src/knowledge/`; `test/orq/modulo.test.ts` falla si divergen; `modulo/tools/oc.ts` reexporta las herramientas | Probarlo cargado en un runtime de agentes real (no lo hice) |
 
 ## 11. Uso de IA
 
-**Qué usé.** Claude Code. Un orquestador (modelo Opus 5.5) planificó, escribió los contratos compartidos, integró el trabajo y revisó. Subagentes (modelo Sonnet) construyeron en paralelo, cada uno con archivos propios: el núcleo (herramientas, validación, SAP simulado, `demo.ts`), el agente (adaptador de Gemini, ciclo, servidor), la interfaz y esta documentación. Hubo además agentes de verificación para comprobar versiones y afirmaciones técnicas contra documentación oficial, y revisión de código y de seguridad antes de cerrar. Los subagentes siguieron una regla: tests antes que código. Declaro todo esto porque el PRD lo pide; reviso y puedo explicar lo que entrego.
+**Qué usé.** Claude Code. Un orquestador (modelo Opus 5.5) planificó, escribió los contratos compartidos, integró el trabajo y revisó. Subagentes (modelo Sonnet) construyeron en paralelo, cada uno con archivos propios: el núcleo (herramientas, validación, SAP simulado, `demo.ts`), el agente (adaptador de Gemini, ciclo, servidor), la interfaz y esta documentación. Hubo además agentes de verificación para comprobar versiones y afirmaciones técnicas contra documentación oficial, y revisión de código y de seguridad antes de cerrar. La regla para los subagentes era tests antes que código; en las reglas de validación los tests se escribieron justo después del código, no antes. Declaro todo esto porque el PRD lo pide; reviso y puedo explicar lo que entrego.
 
 **Qué descarté de lo que se propuso o evalué, y por qué.**
 
@@ -221,7 +222,7 @@ Los que detecté al leer los fixtures:
 | Despliegue en Vercel | Las sesiones en memoria y la escritura en `out/` no encajan en funciones sin estado; se pasó a Railway (§8). Se había escrito un respaldo en la fase A y se retiró |
 | Confirmación por token HMAC de la fase A | El PRD pide confirmación conversacional y que sol-001 se cree sin intervención. El token obligaba a un paso aparte en la UI incluso en el caso limpio. Se sustituyó por la guardia en el servidor (§3), que cumple lo mismo (el modelo no puede crear sin confirmación humana) |
 | Framework de agentes | Ver decisión 6 (§8) |
-| Capa de seguridad de la fase A (`mask`, `redact`, envoltura de documentos) <!-- VERIFICAR: qué se conservó en la versión final --> | Los fixtures son ficticios y el PRD pide solo que la clave no aparezca en front, logs ni respuestas |
+| Parte de la capa de seguridad de la fase A | Se conservan `redact` (logs del servidor y errores) y `mask` (argumentos en `out/log.jsonl`). La salida SSE no se enmascara: los fixtures son ficticios y el PRD pide solo que la clave no aparezca en front, logs ni respuestas. La envoltura de documentos (`src/security/documento.ts`) quedó sin uso en el servidor |
 
 La fase A se hizo antes de recibir el PRD v2.0 con un enunciado genérico; la fase B reescribió contratos, núcleo y documentación contra el PRD y los fixtures reales.
 

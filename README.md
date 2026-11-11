@@ -29,8 +29,8 @@ La plantilla es `.env.example`. La clave real nunca se versiona.
 | `GEMINI_API_KEY` | Clave de la API de Gemini. Solo la lee el backend | vacía: el chat avisa |
 | `GEMINI_MODEL` | Modelo de Gemini | `gemini-3.6-flash` |
 | `PORT` | Puerto HTTP | `3000` |
-| `MAX_ITERACIONES` | Tope de vueltas herramienta → modelo por turno | 25 <!-- VERIFICAR --> |
-| `MAX_TOKENS_SESION` | Tope de tokens acumulados por sesión | <!-- VERIFICAR: valor --> |
+| `MAX_ITERACIONES` | Tope de vueltas herramienta → modelo por turno | `25` |
+| `MAX_TOKENS_SESION` | Tope de tokens acumulados por sesión | `200000` |
 
 ## Comandos
 
@@ -43,7 +43,7 @@ La plantilla es `.env.example`. La clave real nunca se versiona.
 
 ### Qué imprime `npm run demo`
 
-Por cada caso de `fixtures/reto-03/solicitudes/`: `apta`, bloqueos, confirmaciones, `retroactiva`, y el número de OC o el motivo de que no se cree. También muestra la idempotencia (sol-001 dos veces devuelve la misma OC) y la confirmación explícita de sol-004. Con `out/` limpio la numeración sale `4500000001` a `4500000004`. <!-- VERIFICAR: salida real de `npm run demo` una vez integrado el núcleo -->
+Por cada caso de `fixtures/reto-03/solicitudes/`: `apta`, bloqueos, confirmaciones, `retroactiva`, y el número de OC o el motivo de que no se cree. También muestra la idempotencia (sol-001 dos veces devuelve la misma OC) y la confirmación explícita de sol-004. Con `out/` limpio la numeración sale `4500000001` a `4500000004`. Termina con «OK: los 6 casos coinciden con casos.esperados.ts» y código de salida 0; si un caso no coincide, sale con 1.
 
 ## API
 
@@ -51,17 +51,21 @@ Por cada caso de `fixtures/reto-03/solicitudes/`: `apta`, bloqueos, confirmacion
 |---|---|---|
 | `POST` | `/api/chat` | `{ sessionId, message, confirmar? }` → stream SSE de eventos (`tool_call`, `tool_result`, `confirmacion_requerida`, `oc_creada`, `mensaje`, `error`, `fin`) |
 | `GET` | `/api/sessions/:id` | Historial completo de la sesión |
-| `GET` | `/api/health` | `{ ok: true, provider, model }`, sin exponer claves |
-| `GET` | `/api/casos` | Lista de casos disponibles |
-| `POST` | `/api/evaluar` | Revisa un caso sin IA (mismas herramientas que el chat) |
+| `GET` | `/api/health` | `{ ok, provider, model, llm_configurado }`, sin exponer claves |
+| `GET` | `/api/casos` | `{ casos: ["sol-001", …] }` |
+| `POST` | `/api/evaluar` | `{ caso, sessionId? }` → SSE con los mismos eventos: lee, valida y arma el payload sin IA y sin crear la OC |
 
-<!-- VERIFICAR: formatos exactos de petición y respuesta de /api/casos y /api/evaluar -->
+Errores: `400` cuerpo inválido, `404` caso o sesión inexistente, `409` sesión ocupada, `413` cuerpo grande, `429` demasiadas peticiones; siempre con `correlationId`.
 
 ## Estructura
 
 ```
 agent/prompt.md              comportamiento: system prompt del agente
-src/server.ts                API HTTP y ciclo del agente
+src/server.ts                API HTTP (Hono)
+src/agent/                   ciclo del agente, sesiones, guardia de confirmación, bitácora
+src/domain/                  reglas RC1–RC10, payload, evidencia, contratos (zod)
+src/data/                    lectura de fixtures, control.csv, candado, Excel
+src/security/                redact, mask, límites
 src/llm/                     adapter.ts (interfaz) y gemini.ts (implementación)
 src/tools/oc.ts              ejecución: herramientas con zod (cada export → oc_<export>)
 src/sap/                     adapter.ts (interfaz SapAdapter) y mock.ts (sobre out/sap/)
@@ -74,7 +78,6 @@ demo.ts                      las herramientas sin modelo
 docs/                        PLAN, RELEVO, GLOSSARY
 ```
 
-<!-- VERIFICAR: la estructura real tras el merge (hay carpetas de la fase A como src/domain/ y src/data/ que pueden seguir) -->
 
 ## Prompt de demo
 
