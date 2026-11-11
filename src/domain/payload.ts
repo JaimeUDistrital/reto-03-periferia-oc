@@ -16,8 +16,8 @@ export function unidadDe(descripcion: string): "UN" | "H" {
 export function construirOrden(p: Paquete, v: Validacion, m: Maestros): { orden: OrdenCompra; trazabilidad: Trazabilidad } {
   const proveedor = proveedorDe(p, m);
   const s = p.solicitud;
-  const condiciones = s.condiciones_pago ?? v.derivados["condiciones_pago"];
-  const iva = s.indicador_iva ?? v.derivados["indicador_iva"];
+  const condiciones = s.condiciones_pago || v.derivados["condiciones_pago"];
+  const iva = s.indicador_iva || v.derivados["indicador_iva"];
   if (proveedor === null || p.aprobacion === null || condiciones === undefined || iva === undefined) {
     throw new ErrorEntrada("No se puede construir la OC: faltan proveedor, aprobación, condiciones de pago o indicador de IVA.", "Resuelve primero los bloqueos de oc_validar.");
   }
