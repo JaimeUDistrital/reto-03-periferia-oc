@@ -9,7 +9,7 @@ import {
   formatearMonto,
   formatearNumero,
   formatearValor,
-  limpiarMarkdown,
+  partirBloques,
   resumenHerramientas,
   resumenResultado,
   totalOrden,
@@ -384,5 +384,40 @@ export function Mensaje({ rol, texto }: { rol: "usuario" | "modelo"; texto: stri
       </div>
     );
   }
-  return <p className="max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap break-words">{limpiarMarkdown(texto)}</p>;
+  return (
+    <div className="grid max-w-[85%] gap-2 text-sm leading-relaxed">
+      {partirBloques(texto).map((b, i) =>
+        b.tipo === "texto" ? (
+          <p key={i} className="whitespace-pre-wrap break-words">
+            {b.texto}
+          </p>
+        ) : (
+          <div key={i} className="overflow-x-auto rounded-md border border-linea bg-papel">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-linea text-xs text-tenue">
+                  {b.cabecera.map((c, j) => (
+                    <th key={j} scope="col" className="px-2 py-1.5 font-medium">
+                      {c}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {b.filas.map((fila, k) => (
+                  <tr key={k} className="border-b border-linea align-top last:border-0">
+                    {fila.map((c, j) => (
+                      <td key={j} className="px-2 py-1.5 whitespace-pre-wrap break-words">
+                        {c}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ),
+      )}
+    </div>
+  );
 }

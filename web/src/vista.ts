@@ -168,3 +168,53 @@ export function limpiarMarkdown(texto: string): string {
     .replace(/`([^`\n]+)`/g, "$1")
     .replace(/^(\s*)[-*]\s+/gm, "$1• ");
 }
+
+/** Bloque de un mensaje del modelo: párrafo limpio o tabla markdown ya partida en celdas. */
+export type BloqueMensaje = { tipo: "texto"; texto: string } | { tipo: "tabla"; cabecera: string[]; filas: string[][] };
+
+const FILA_TABLA = /^\s*\|.*\|\s*$/;
+const SEPARADOR_TABLA = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/;
+
+function celdas(linea: string): string[] {
+  return linea
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((c) => limpiarMarkdown(c.replace(/\s*<br\s*\/?>\s*/gi, "\n").trim()));
+}
+
+/**
+ * Parte el texto del modelo en párrafos y tablas markdown (cabecera + fila `| --- |`), para pintarlas
+ * como tablas de verdad. Solo devuelve texto: el componente las pinta con elementos React, sin HTML.
+ */
+export function partirBloques(texto: string): BloqueMensaje[] {
+  const lineas = texto.split("\n");
+  const bloques: BloqueMensaje[] = [];
+  let parrafo: string[] = [];
+  const volcar = () => {
+    const t = parrafo.join("\n").trim();
+    if (t !== "") bloques.push({ tipo: "texto", texto: limpiarMarkdown(t) });
+    parrafo = [];
+  };
+  for (let i = 0; i < lineas.length; i++) {
+    const linea = lineas[i] ?? "";
+    if (FILA_TABLA.test(linea) && SEPARADOR_TABLA.test(lineas[i + 1] ?? "")) {
+      volcar();
+      const cabecera = celdas(linea);
+      const filas: string[][] = [];
+      i += 2;
+      while (i < lineas.length && FILA_TABLA.test(lineas[i] ?? "")) {
+        const fila = celdas(lineas[i] ?? "");
+        filas.push(cabecera.map((_, j) => fila[j] ?? ""));
+        i++;
+      }
+      i--;
+      bloques.push({ tipo: "tabla", cabecera, filas });
+    } else {
+      parrafo.push(linea);
+    }
+  }
+  volcar();
+  return bloques;
+}

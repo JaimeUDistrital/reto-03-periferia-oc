@@ -14,6 +14,7 @@ import {
   mensajeConfirmar,
   mensajeNoConfirmar,
   mensajeProcesar,
+  partirBloques,
   resumenHerramientas,
   resumenResultado,
 } from "../../web/src/vista";
@@ -201,5 +202,45 @@ describe("limpiarMarkdown", () => {
 
   it("no toca un texto sin marcas ni multiplicaciones sueltas", () => {
     assert.equal(limpiarMarkdown("Total 2 * 3 = 6 y fin."), "Total 2 * 3 = 6 y fin.");
+  });
+});
+
+describe("partirBloques (tablas del modelo como tablas, no como barras «|»)", () => {
+  it("un texto sin tabla es un solo bloque limpio", () => {
+    assert.deepEqual(partirBloques("La **sol-001** está lista."), [{ tipo: "texto", texto: "La sol-001 está lista." }]);
+  });
+
+  it("separa texto, tabla y texto; limpia las celdas y convierte <br> en salto de línea", () => {
+    const texto = [
+      "### Resumen de la OC",
+      "",
+      "| Proveedor | Importes | Cond. Pago |",
+      "| --- | :---: | --- |",
+      "| **Cloud Andina S.A.S.** | Unitario: $250.000 <br> Total: $25.000.000 | Z000 |",
+      "| Otro | `1` | Z030 |",
+      "",
+      "¿Confirmas que cree la OC?",
+    ].join("\n");
+    assert.deepEqual(partirBloques(texto), [
+      { tipo: "texto", texto: "Resumen de la OC" },
+      {
+        tipo: "tabla",
+        cabecera: ["Proveedor", "Importes", "Cond. Pago"],
+        filas: [
+          ["Cloud Andina S.A.S.", "Unitario: $250.000\nTotal: $25.000.000", "Z000"],
+          ["Otro", "1", "Z030"],
+        ],
+      },
+      { tipo: "texto", texto: "¿Confirmas que cree la OC?" },
+    ]);
+  });
+
+  it("líneas con barras sin fila separadora siguen siendo texto", () => {
+    assert.deepEqual(partirBloques("a | b\n| c |"), [{ tipo: "texto", texto: "a | b\n| c |" }]);
+  });
+
+  it("completa con celdas vacías las filas más cortas que la cabecera", () => {
+    const [tabla] = partirBloques("| A | B |\n|---|---|\n| 1 |");
+    assert.deepEqual(tabla, { tipo: "tabla", cabecera: ["A", "B"], filas: [["1", ""]] });
   });
 });
