@@ -8,6 +8,7 @@
     "node": ">=22.12"
   },
   "scripts": {
+    "dev": "npm run build && npm start",
     "dev:server": "node --watch --import tsx src/server/main.ts",
     "dev:web": "vite --config web/vite.config.ts",
     "build": "vite build --config web/vite.config.ts",
@@ -20,8 +21,10 @@
     "@google/genai": "3.1.0",
     "@hono/node-server": "2.1.6",
     "hono": "4.13.17",
+    "pdf-lib": "1.17.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "read-excel-file": "9.3.14",
     "tsx": "4.23.15",
     "zod": "4.6.7"
   },

@@ -8,7 +8,7 @@ import { evaluarSolicitud, listarSolicitudes } from "./src/tools/oc";
 
 async function cargarEsperados(): Promise<Record<string, Decision> | null> {
   try {
-    const modulo = (await import("./test/core/casos.esperados")) as { CASOS_ESPERADOS?: Record<string, Decision> };
+    const modulo = (await import("./test/core/casos.esperados")) as unknown as { CASOS_ESPERADOS?: Record<string, Decision> };
     return modulo.CASOS_ESPERADOS ?? null;
   } catch {
     return null; // sin archivo de casos esperados: solo se muestra

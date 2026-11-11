@@ -1,6 +1,42 @@
 [
-  { "nit": "900.123.456-7", "razonSocial": "Suministros Andinos S.A.S.", "estado": "activo", "condicionPago": "CP30", "indicadorIva": "V1" },
-  { "nit": "800.765.432-1", "razonSocial": "Tecnología Cafetera Ltda.", "estado": "activo", "condicionPago": "CP45", "indicadorIva": "V1" },
-  { "nit": "901.555.111-3", "razonSocial": "Insumos del Norte S.A.", "estado": "bloqueado", "condicionPago": "CP30", "indicadorIva": "V1" },
-  { "nit": "860.222.333-5", "razonSocial": "Papelería Central S.A.", "estado": "inactivo", "condicionPago": "CP15", "indicadorIva": "V2" }
+  {
+    "codigo_sap": "100234",
+    "nit": "900555111",
+    "nombre": "TecnoSuministros S.A.S.",
+    "condiciones_pago_default": "Z030",
+    "indicador_iva_default": "C1",
+    "activo": true
+  },
+  {
+    "codigo_sap": "100310",
+    "nit": "901222333",
+    "nombre": "Cloud Andina S.A.S.",
+    "condiciones_pago_default": "Z000",
+    "indicador_iva_default": "C1",
+    "activo": true
+  },
+  {
+    "codigo_sap": "100118",
+    "nit": "800444555",
+    "nombre": "Papelería Central Ltda.",
+    "condiciones_pago_default": "Z015",
+    "indicador_iva_default": "C1",
+    "activo": true
+  },
+  {
+    "codigo_sap": "100150",
+    "nit": "830111222",
+    "nombre": "Mobiliario Andino S.A.",
+    "condiciones_pago_default": "Z030",
+    "indicador_iva_default": "C1",
+    "activo": true
+  },
+  {
+    "codigo_sap": "100402",
+    "nit": "901777888",
+    "nombre": "Consultores Ágiles S.A.S.",
+    "condiciones_pago_default": "Z030",
+    "indicador_iva_default": "C1",
+    "activo": false
+  }
 ]

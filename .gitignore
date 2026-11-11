@@ -23,3 +23,6 @@ coverage/
 Documnetos_de_contexto/
 PRD.md
 *.pdf
+
+# Generado en ejecución (SAP simulado, control, evidencias, log)
+out/
