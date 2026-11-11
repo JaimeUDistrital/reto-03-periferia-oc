@@ -1,12 +1,9 @@
-/** Límites anti-abuso y de coste (docs/PLAN.md §5.6). Todo en memoria: una sola instancia. */
+/** Límites anti-abuso y de coste. Todo en memoria: una sola instancia. Iteraciones y tokens por sesión: src/config/env.ts. */
 
 export const LIMITES = {
   maxMensaje: 2000,
-  maxTurnosHistorial: 60,
-  maxIteraciones: 8,
-  timeoutLlmMs: 30_000,
+  timeoutLlmMs: 60_000,
   maxBodyBytes: 256 * 1024,
-  maxTokensSalida: 1024,
 } as const;
 
 export interface RateLimiter {
@@ -46,10 +43,16 @@ export function crearRateLimiter(opciones: { max: number; ventanaMs: number; aho
   };
 }
 
+export class TiempoAgotadoError extends Error {
+  constructor() {
+    super("Tiempo de espera agotado");
+  }
+}
+
 export function conTimeout<T>(promesa: Promise<T>, ms: number): Promise<T> {
   let temporizador: NodeJS.Timeout | undefined;
   const vencido = new Promise<never>((_resolve, reject) => {
-    temporizador = setTimeout(() => reject(new Error("Tiempo de espera agotado")), ms);
+    temporizador = setTimeout(() => reject(new TiempoAgotadoError()), ms);
   });
   return Promise.race([promesa, vencido]).finally(() => clearTimeout(temporizador));
 }

@@ -1,17 +1,17 @@
 /**
- * Adaptador LlmPort → @google/genai 3.1.0.
+ * Implementación de LlmAdapter para @google/genai 3.1.0.
  * Gemini 3 puede exigir que se reenvíen las firmas de pensamiento: el Content original del modelo
- * viaja en `nativo` y se devuelve tal cual. Como el historial pasa por el navegador, `nativo` se
- * valida (solo rol model, solo texto/functionCall) y, si no cuadra con las llamadas, se descarta.
+ * viaja en `nativo` y se devuelve tal cual. Por defensa, `nativo` se valida (solo rol model, solo
+ * texto/functionCall) y, si no cuadra con las llamadas, se descarta.
  */
 import { randomUUID } from "node:crypto";
 import { GoogleGenAI, type Content, type FunctionDeclaration, type GenerateContentResponse, type Part } from "@google/genai";
 import * as z from "zod";
-import type { LlmPort, LlamadaTool, RespuestaLlm, ToolDef, TurnoHistorial } from "../domain/contratos";
-import { LIMITES } from "../security/limites";
 import { redactarError } from "../security/redact";
+import type { DescriptorHerramienta, LlamadaHerramienta, LlmAdapter, Mensaje, RespuestaLlm } from "./adapter";
 
 const PREFIJO_ID_LOCAL = "gen-";
+const MAX_TOKENS_SALIDA = 8192;
 
 const ParteNativaSchema = z
   .object({
@@ -25,7 +25,7 @@ const ParteNativaSchema = z
   .refine((p) => p.text !== undefined || p.functionCall !== undefined);
 const ContentNativoSchema = z.object({ role: z.literal("model"), parts: z.array(ParteNativaSchema) });
 
-function nativoCoherente(nativo: unknown, llamadas: LlamadaTool[]): Content | undefined {
+function nativoCoherente(nativo: unknown, llamadas: LlamadaHerramienta[]): Content | undefined {
   const r = ContentNativoSchema.safeParse(nativo);
   if (!r.success) return undefined;
   const nombres = r.data.parts.flatMap((p) => (p.functionCall ? [p.functionCall.name] : []));
@@ -44,8 +44,19 @@ function comoObjeto(resultado: unknown): Record<string, unknown> {
   return { resultado };
 }
 
-/** Historial neutral → Content[] de Gemini (función pura). */
-export function aContents(historial: TurnoHistorial[]): Content[] {
+function contentDeModelo(m: Extract<Mensaje, { rol: "modelo" }>): Content | undefined {
+  const nativo = nativoCoherente(m.nativo, m.llamadas);
+  if (nativo) return nativo;
+  const parts: Part[] = [];
+  if (m.texto) parts.push({ text: m.texto });
+  for (const l of m.llamadas) {
+    parts.push({ functionCall: { ...idRemoto(l.id), name: l.nombre, args: comoObjeto(l.args) } });
+  }
+  return parts.length > 0 ? { role: "model", parts } : undefined;
+}
+
+/** Mensajes neutrales → Content[] de Gemini (función pura). */
+export function aContents(mensajes: Mensaje[]): Content[] {
   const contents: Content[] = [];
   let respuestas: Part[] = [];
   const vaciarRespuestas = (): void => {
@@ -53,72 +64,61 @@ export function aContents(historial: TurnoHistorial[]): Content[] {
     respuestas = [];
   };
 
-  for (const turno of historial) {
-    if (turno.tipo === "resultado_tool") {
-      respuestas.push({ functionResponse: { ...idRemoto(turno.llamadaId), name: turno.nombre, response: comoObjeto(turno.resultado) } });
+  for (const m of mensajes) {
+    if (m.rol === "herramienta") {
+      respuestas.push({ functionResponse: { ...idRemoto(m.llamadaId), name: m.nombre, response: comoObjeto(m.resultado) } });
       continue;
     }
     vaciarRespuestas();
-    if (turno.tipo === "usuario") {
-      contents.push({ role: "user", parts: [{ text: turno.texto }] });
+    if (m.rol === "usuario") {
+      contents.push({ role: "user", parts: [{ text: m.texto }] });
       continue;
     }
-    const nativo = nativoCoherente(turno.nativo, turno.llamadas);
-    if (nativo) {
-      contents.push(nativo);
-      continue;
-    }
-    const parts: Part[] = [];
-    if (turno.texto) parts.push({ text: turno.texto });
-    for (const l of turno.llamadas) {
-      parts.push({ functionCall: { ...idRemoto(l.id), name: l.nombre, args: comoObjeto(l.args) } });
-    }
-    if (parts.length > 0) contents.push({ role: "model", parts });
+    const content = contentDeModelo(m);
+    if (content) contents.push(content);
   }
   vaciarRespuestas();
   return contents;
 }
 
-export function aDeclaraciones(tools: ToolDef[]): FunctionDeclaration[] {
-  return tools.map((tool) => {
-    const { $schema: _omitido, ...parametros } = z.toJSONSchema(tool.entrada, { io: "input" });
-    return { name: tool.nombre, description: tool.descripcion, parametersJsonSchema: parametros };
-  });
+export function aDeclaraciones(herramientas: DescriptorHerramienta[]): FunctionDeclaration[] {
+  return herramientas.map((h) => ({ name: h.nombre, description: h.descripcion, parametersJsonSchema: h.parametros }));
 }
 
 /** Respuesta de Gemini → RespuestaLlm (función pura). */
-export function desdeRespuesta(respuesta: Partial<Pick<GenerateContentResponse, "candidates" | "functionCalls">>): RespuestaLlm {
+export function desdeRespuesta(
+  respuesta: Partial<Pick<GenerateContentResponse, "candidates" | "functionCalls" | "usageMetadata">>,
+): RespuestaLlm {
   const content = respuesta.candidates?.[0]?.content;
   const texto = content?.parts?.filter((p) => typeof p.text === "string" && p.thought !== true).map((p) => p.text).join("");
-  const llamadas: LlamadaTool[] = (respuesta.functionCalls ?? []).map((fc) => ({
+  const llamadas: LlamadaHerramienta[] = (respuesta.functionCalls ?? []).map((fc) => ({
     id: fc.id ?? `${PREFIJO_ID_LOCAL}${randomUUID()}`,
     nombre: fc.name ?? "",
     args: fc.args ?? {},
   }));
-  return { texto: texto || undefined, llamadas, nativo: content };
+  return { texto: texto || undefined, llamadas, nativo: content, tokens: respuesta.usageMetadata?.totalTokenCount ?? 0 };
 }
 
 export interface OpcionesGemini {
   apiKey: string;
   modelo: string;
-  timeoutMs?: number;
-  maxTokensSalida?: number;
 }
 
-export function crearLlmGemini(opciones: OpcionesGemini): LlmPort {
+export function crearLlmGemini(opciones: OpcionesGemini): LlmAdapter {
   const ai = new GoogleGenAI({ apiKey: opciones.apiKey });
-  const timeoutMs = opciones.timeoutMs ?? LIMITES.timeoutLlmMs;
   return {
-    async generar({ sistema, historial, tools }) {
+    proveedor: "gemini",
+    modelo: opciones.modelo,
+    async enviar(mensajes, herramientas, { sistema, timeoutMs, maxTokensSalida }) {
       try {
         const respuesta = await ai.models.generateContent({
           model: opciones.modelo,
-          contents: aContents(historial),
+          contents: aContents(mensajes),
           config: {
             systemInstruction: sistema,
-            tools: tools.length > 0 ? [{ functionDeclarations: aDeclaraciones(tools) }] : undefined,
+            tools: herramientas.length > 0 ? [{ functionDeclarations: aDeclaraciones(herramientas) }] : undefined,
             temperature: 0,
-            maxOutputTokens: opciones.maxTokensSalida ?? LIMITES.maxTokensSalida,
+            maxOutputTokens: maxTokensSalida ?? MAX_TOKENS_SALIDA,
             abortSignal: AbortSignal.timeout(timeoutMs),
           },
         });
