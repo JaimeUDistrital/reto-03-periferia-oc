@@ -30,7 +30,7 @@ Solo lo actualiza el orquestador; nada pasa a ✅ sin el comando que lo prueba.
 | A1 | Núcleo determinista, tools, SAP simulado, `demo.ts` | CORE | 🔄 | — |
 | A2 | Bucle del agente, Gemini, seguridad, servidor, `prompt.md` | AGENTE | 🔄 | — |
 | A3 | UI de chat, tool calls, HITL, «Evaluar sin IA» | UI | 🔄 | — |
-| A4 | README, SOLUCION (borrador), GLOSSARY | DOCS | 🔄 | — |
+| A4 | README, SOLUCION (borrador), GLOSSARY | DOCS | ✅ | 3 archivos, 8 secciones, 6 ADR, 16 marcas «no verificado» · merge `a352934` |
 | A5 | Merge, /code-review medium, security-auditor, deploy, humo en URL | ORQ | ⬜ | — |
 | B1 | PRD + fixtures reales → matriz §8 y casos esperados | ORQ | ⬜ | — |
 | B2 | Adaptar data y controles a los datos reales | CORE | ⬜ | — |

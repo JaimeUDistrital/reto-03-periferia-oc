@@ -15,6 +15,10 @@
 
 ## Registro (más reciente arriba)
 
+### A4 cerrada · DOCS (Sonnet/medium) → merge ORQ
+- **Hecho:** README.md, SOLUCION.md (8 secciones, 6 ADR, 2 diagramas Mermaid), docs/GLOSSARY.md. Merge `a352934`.
+- **Pendiente exacto (B3):** rellenar `<!-- MATRIZ … -->` y `<!-- DATOS REALES B3 -->` en SOLUCION; `<!-- URL -->` en README; revisar las 16 marcas «(no verificado)» (nombres técnicos de campos SAP, cliente RFC para Node, auth OData, BAPIRET2); citar bien la fuente de Railpack (`https://railpack.com/languages/node`).
+
 ### 21:58 · A0 cerrada · ORQ (Opus 5.5)
 - **Hecho:** deps exactas (verificadas por `verificador`); `tsconfig` raíz y web; `src/domain/contratos.ts` (+ fachada `NucleoOC`); stub `src/tools/oc.ts`; servidor y web mínimos; CI; PLAN con stack verificado y HITL sin estado (HMAC).
 - **Pruebas:** typecheck OK · test 2/2 · build OK · `/api/salud` OK.
