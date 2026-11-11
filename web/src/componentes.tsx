@@ -1,29 +1,48 @@
 import { useState } from "react";
 import type { Decision, Dictamen, EstadoControl, OrdenCompra } from "../../src/domain/contratos";
-import type { Confirmacion, Item } from "./estado";
+import type { Confirmacion } from "./estado";
+import type { ItemTool } from "./vista";
+import { etiquetaTool, limpiarMarkdown, resumenControles, resumenHerramientas } from "./vista";
 
 // Clases completas (Tailwind no detecta nombres armados dinámicamente).
-const COLOR_CONTROL: Record<EstadoControl, string> = {
-  OK: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
-  ALERTA: "border-amber-500/40 bg-amber-500/10 text-amber-300",
-  BLOQUEO: "border-rose-500/40 bg-rose-500/10 text-rose-300",
+const foco = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento";
+const baseBoton = `inline-flex min-h-10 max-sm:min-h-11 touch-manipulation items-center justify-center gap-2 rounded-md px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${foco}`;
+export const botonPrimario = `${baseBoton} bg-acento text-white hover:bg-acento-fuerte`;
+export const botonSecundario = `${baseBoton} border border-linea bg-papel text-tinta hover:bg-lienzo`;
+export const botonTexto = `rounded-md px-2 py-1 text-sm text-acento underline-offset-2 hover:underline disabled:opacity-50 ${foco}`;
+
+interface Tono {
+  texto: string;
+  icono: string;
+  clase: string;
+}
+const TONO_CONTROL: Record<EstadoControl, Tono> = {
+  OK: { texto: "En orden", icono: "✓", clase: "bg-ok-suave text-ok" },
+  ALERTA: { texto: "Alerta", icono: "!", clase: "bg-alerta-suave text-alerta" },
+  BLOQUEO: { texto: "Bloquea", icono: "✕", clase: "bg-bloqueo-suave text-bloqueo" },
 };
-const COLOR_DECISION: Record<Decision, string> = {
-  APROBABLE: COLOR_CONTROL.OK,
-  REQUIERE_REVISION: COLOR_CONTROL.ALERTA,
-  RECHAZADA: COLOR_CONTROL.BLOQUEO,
-};
-const TEXTO_DECISION: Record<Decision, string> = {
-  APROBABLE: "Aprobable",
-  REQUIERE_REVISION: "Requiere revisión",
-  RECHAZADA: "Rechazada",
+const TONO_DECISION: Record<Decision, Tono> = {
+  APROBABLE: { ...TONO_CONTROL.OK, texto: "Aprobable" },
+  REQUIERE_REVISION: { ...TONO_CONTROL.ALERTA, texto: "Requiere revisión" },
+  RECHAZADA: { ...TONO_CONTROL.BLOQUEO, texto: "Rechazada" },
 };
 
-const foco = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-300";
-export const boton = `rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 ${foco}`;
+function Icono({ tono }: { tono: Tono }) {
+  return (
+    <span aria-hidden="true" className={`inline-flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${tono.clase}`}>
+      {tono.icono}
+    </span>
+  );
+}
 
-function Etiqueta({ clase, children }: { clase: string; children: string }) {
-  return <span className={`inline-block rounded border px-1.5 py-0.5 font-mono text-xs ${clase}`}>{children}</span>;
+export function Insignia({ decision }: { decision: Decision }) {
+  const tono = TONO_DECISION[decision];
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-semibold ${tono.clase}`}>
+      <span aria-hidden="true">{tono.icono}</span>
+      {tono.texto}
+    </span>
+  );
 }
 
 const aTexto = (v: unknown): string => {
@@ -34,86 +53,126 @@ const aTexto = (v: unknown): string => {
   }
 };
 
-export function TarjetaTool({ item }: { item: Extract<Item, { tipo: "tool" }> }) {
-  const r = item.resultado;
-  const estado = !r ? "en curso" : r.ok ? "ok" : "error";
-  const color = !r ? "text-zinc-400" : r.ok ? "text-emerald-400" : "text-rose-400";
+function FilaHerramienta({ tool }: { tool: ItemTool }) {
+  const r = tool.resultado;
+  const tono: Tono = !r ? { texto: "En curso", icono: "…", clase: "bg-lienzo text-tenue" } : r.ok ? TONO_CONTROL.OK : { ...TONO_CONTROL.BLOQUEO, texto: "Error" };
   return (
-    <details className="rounded-md border border-zinc-800 bg-zinc-900/50 font-mono text-xs">
-      <summary className={`cursor-pointer select-none px-3 py-2 ${foco}`}>
-        <span className="text-zinc-200">{item.nombre}</span>{" "}
-        <span className={color}>{estado}</span>
-        {r && <span className="text-zinc-500"> · {r.ms} ms</span>}
+    <li>
+      <details className="group">
+        <summary className={`flex cursor-pointer list-none items-center gap-2 rounded px-2 py-1.5 hover:bg-lienzo ${foco}`}>
+          <Icono tono={tono} />
+          <span className="sr-only">{tono.texto}:</span>
+          <span className="text-sm">{etiquetaTool(tool.nombre)}</span>
+          <code translate="no" className="hidden truncate text-xs text-tenue sm:inline">{tool.nombre}</code>
+          {r && <span className="ml-auto text-xs tabular-nums text-tenue">{r.ms} ms</span>}
+        </summary>
+        <div className="mt-1 mb-2 ml-9 space-y-2 text-xs">
+          <p className="text-tenue">Entrada</p>
+          <pre className="overflow-x-auto rounded bg-lienzo p-2 font-mono whitespace-pre-wrap break-words">{aTexto(tool.entrada)}</pre>
+          {r && (
+            <>
+              <p className="text-tenue">Salida</p>
+              <pre className="max-h-64 overflow-auto rounded bg-lienzo p-2 font-mono whitespace-pre-wrap break-words">{aTexto(r.salida)}</pre>
+            </>
+          )}
+        </div>
+      </details>
+    </li>
+  );
+}
+
+export function BloqueHerramientas({ tools }: { tools: ItemTool[] }) {
+  return (
+    <details open className="rounded-lg border border-linea">
+      <summary className={`cursor-pointer px-3 py-2 text-sm text-tenue ${foco}`}>
+        Herramientas usadas: <span className="tabular-nums">{resumenHerramientas(tools)}</span>
       </summary>
-      <div className="space-y-2 border-t border-zinc-800 p-3">
-        <p className="text-zinc-500">entrada</p>
-        <pre className="overflow-x-auto whitespace-pre-wrap break-words text-zinc-300">{aTexto(item.entrada)}</pre>
-        {r && (
-          <>
-            <p className="text-zinc-500">salida</p>
-            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words text-zinc-300">{aTexto(r.salida)}</pre>
-          </>
-        )}
-      </div>
+      <ul className="border-t border-linea p-1">
+        {tools.map((t) => (
+          <FilaHerramienta key={t.id} tool={t} />
+        ))}
+      </ul>
     </details>
   );
 }
 
-export function MatrizControles({ dictamen }: { dictamen: Dictamen }) {
+export function ListaControles({ dictamen }: { dictamen: Dictamen }) {
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-3">
       {dictamen.controles.map((c) => (
-        <li key={c.id} className={`rounded-md border p-2 ${COLOR_CONTROL[c.estado]}`}>
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium">{c.nombre}</span>
-            <span className="font-mono text-xs">{c.estado}</span>
+        <li key={c.id} className="flex gap-2.5">
+          <Icono tono={TONO_CONTROL[c.estado]} />
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              {c.nombre}
+              <span className="sr-only">: {TONO_CONTROL[c.estado].texto}</span>
+            </p>
+            <p className="text-sm text-tenue">{c.detalle}</p>
           </div>
-          <p className="mt-1 text-xs text-zinc-300">{c.detalle}</p>
         </li>
       ))}
     </ul>
   );
 }
 
-export function Expediente({ dictamen }: { dictamen: Dictamen | null }) {
+export function PanelResultado({ dictamen, orden }: { dictamen: Dictamen | null; orden: OrdenCompra | null }) {
+  const ordenDeEsta = orden && dictamen && orden.solicitudId === dictamen.solicitudId ? orden : null;
   return (
-    <aside aria-label="Expediente" className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-      <h2 className="text-sm font-semibold text-zinc-200">Expediente</h2>
-      {dictamen ? (
-        <>
-          <p className="font-mono text-xs text-zinc-400">{dictamen.solicitudId}</p>
-          <Etiqueta clase={COLOR_DECISION[dictamen.decision]}>{TEXTO_DECISION[dictamen.decision]}</Etiqueta>
-          <MatrizControles dictamen={dictamen} />
-          <p className="break-all font-mono text-[10px] text-zinc-600">hash {dictamen.hash}</p>
-        </>
+    <aside aria-labelledby="titulo-resultado" className="rounded-lg border border-linea bg-papel p-4 lg:overflow-y-auto">
+      <h2 id="titulo-resultado" className="text-sm font-semibold text-tenue">
+        Resultado de la revisión
+      </h2>
+      {!dictamen ? (
+        <p className="mt-3 text-sm text-tenue">Cuando revises una solicitud, aquí verás cada control y si está en orden.</p>
       ) : (
-        <p className="text-sm text-zinc-500">Aún no hay un dictamen. Valida una solicitud para verlo aquí.</p>
+        <div className="mt-3 space-y-4">
+          <div className="space-y-2">
+            <p className="text-lg font-semibold" translate="no">{dictamen.solicitudId}</p>
+            <Insignia decision={dictamen.decision} />
+            <p className="text-sm text-tenue tabular-nums">{resumenControles(dictamen)}</p>
+          </div>
+          {ordenDeEsta && (
+            <p className="rounded-md bg-ok-suave px-3 py-2 text-sm text-ok">
+              Orden de compra <span className="font-semibold tabular-nums">{ordenDeEsta.numero}</span>
+            </p>
+          )}
+          <ListaControles dictamen={dictamen} />
+          <details className="text-xs text-tenue">
+            <summary className={`cursor-pointer ${foco}`}>Detalles técnicos</summary>
+            <p className="mt-1 break-all font-mono" translate="no">Huella del dictamen: {dictamen.hash}</p>
+          </details>
+        </div>
       )}
     </aside>
   );
 }
 
-export function TarjetaHitl({ confirmacion, onDecidir }: { confirmacion: Confirmacion; onDecidir: (accion: "aprobar" | "rechazar") => void }) {
-  const [decidida, setDecidida] = useState(false);
-  const decidir = (accion: "aprobar" | "rechazar") => {
-    if (decidida) return;
-    setDecidida(true);
+type Accion = "aprobar" | "rechazar";
+
+export function TarjetaDecision({ confirmacion, onDecidir }: { confirmacion: Confirmacion; onDecidir: (accion: Accion) => void }) {
+  const [elegida, setElegida] = useState<Accion | null>(null);
+  const decidir = (accion: Accion) => {
+    if (elegida) return;
+    setElegida(accion);
     onDecidir(accion);
   };
   const d = confirmacion.dictamen;
   return (
-    <section aria-label="Confirmación requerida" className="space-y-3 rounded-lg border border-amber-500/40 bg-zinc-900 p-4">
-      <h3 className="text-sm font-semibold text-zinc-100">
-        Confirmación requerida · <span className="font-mono">{confirmacion.solicitudId}</span>
+    <section aria-labelledby="titulo-decision" className="space-y-3 rounded-lg border-2 border-acento bg-acento-suave p-4">
+      <h3 id="titulo-decision" className="font-semibold">
+        Tu decisión sobre <span translate="no">{confirmacion.solicitudId}</span>
       </h3>
-      <Etiqueta clase={COLOR_DECISION[d.decision]}>{TEXTO_DECISION[d.decision]}</Etiqueta>
-      <MatrizControles dictamen={d} />
+      <div className="flex flex-wrap items-center gap-2">
+        <Insignia decision={d.decision} />
+        <span className="text-sm tabular-nums">{resumenControles(d)}</span>
+      </div>
+      <p className="text-sm text-tenue">Si confirmas, se crea la orden de compra en SAP (simulado). Nada se crea sin tu confirmación.</p>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={`${boton} border-emerald-600 text-emerald-300`} disabled={decidida} onClick={() => decidir("aprobar")}>
-          Aprobar y crear OC
+        <button type="button" className={botonPrimario} disabled={elegida !== null} onClick={() => decidir("aprobar")}>
+          {elegida === "aprobar" ? "Creando orden…" : "Crear orden de compra"}
         </button>
-        <button type="button" className={`${boton} border-rose-700 text-rose-300`} disabled={decidida} onClick={() => decidir("rechazar")}>
-          Rechazar
+        <button type="button" className={botonSecundario} disabled={elegida !== null} onClick={() => decidir("rechazar")}>
+          No crear
         </button>
       </div>
     </section>
@@ -122,33 +181,35 @@ export function TarjetaHitl({ confirmacion, onDecidir }: { confirmacion: Confirm
 
 export function AvisoOc({ orden }: { orden: OrdenCompra }) {
   return (
-    <div role="status" className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-300">
-      Orden de compra creada: <span className="font-mono font-semibold">{orden.numero}</span> · solicitud{" "}
-      <span className="font-mono">{orden.solicitudId}</span>
+    <div role="status" className="rounded-lg border border-ok/30 bg-ok-suave p-4 text-ok">
+      <p className="text-sm font-medium">Orden de compra creada</p>
+      <p className="text-2xl font-semibold tabular-nums">{orden.numero}</p>
+      <p className="text-sm">
+        Solicitud <span translate="no">{orden.solicitudId}</span> en SAP (simulado)
+      </p>
     </div>
   );
 }
 
 export function BannerError({ mensaje, correlationId }: { mensaje: string; correlationId: string }) {
   return (
-    <div role="alert" className="rounded-lg border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-300">
+    <div role="alert" className="rounded-lg border border-bloqueo/30 bg-bloqueo-suave p-3 text-sm text-bloqueo">
+      <p className="font-medium">No se pudo completar</p>
       <p>{mensaje}</p>
-      <p className="mt-1 font-mono text-xs text-rose-400/80">correlationId: {correlationId}</p>
+      <p className="mt-1 text-xs">
+        Código de seguimiento: <span className="font-mono" translate="no">{correlationId}</span>
+      </p>
     </div>
   );
 }
 
-export function Burbuja({ rol, texto }: { rol: "usuario" | "modelo"; texto: string }) {
-  const esUsuario = rol === "usuario";
-  return (
-    <div className={esUsuario ? "flex justify-end" : "flex justify-start"}>
-      <p
-        className={`max-w-[85%] whitespace-pre-wrap break-words rounded-lg border px-3 py-2 text-sm ${
-          esUsuario ? "border-zinc-700 bg-zinc-800 text-zinc-100" : "border-zinc-800 bg-zinc-900 text-zinc-200"
-        }`}
-      >
-        {texto}
-      </p>
-    </div>
-  );
+export function Mensaje({ rol, texto }: { rol: "usuario" | "modelo"; texto: string }) {
+  if (rol === "usuario") {
+    return (
+      <div className="flex justify-end">
+        <p className="max-w-[85%] rounded-lg bg-acento-suave px-3 py-2 text-sm whitespace-pre-wrap break-words">{texto}</p>
+      </div>
+    );
+  }
+  return <p className="max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap break-words">{limpiarMarkdown(texto)}</p>;
 }

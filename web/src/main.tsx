@@ -8,8 +8,6 @@ if (!raiz) throw new Error("Falta #root en index.html");
 
 createRoot(raiz).render(
   <StrictMode>
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
-      <App />
-    </div>
+    <App />
   </StrictMode>,
 );
