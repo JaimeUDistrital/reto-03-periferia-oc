@@ -1,122 +1,232 @@
 /**
- * Bucle LLM ↔ tools (docs/PLAN.md §2). El código decide; el modelo orquesta y explica:
- *  - las tools con requiereConfirmacion NUNCA se ejecutan aquí: se evalúa la solicitud y, solo si el
- *    dictamen es APROBABLE, se emite un token firmado para que lo confirme una persona (/api/confirmar);
- *  - toda salida de tool pasa por mask() antes de llegar al modelo o a la UI.
+ * Ciclo del agente (PRD §6.3): prompt → modelo → herramientas → respuesta.
+ *  CA1 tope de iteraciones por turno · CA3 confirmación humana decidida por el servidor
+ *  CA4 cada llamada a herramienta queda en el historial y en out/log.jsonl · CA5 los errores no matan la sesión.
+ * El modelo orquesta y explica; los valores salen de las herramientas.
  */
 import { randomUUID } from "node:crypto";
 import * as z from "zod";
-import type { LlamadaTool, LlmPort, NucleoOC, TurnoHistorial } from "../domain/contratos";
-import { LIMITES, conTimeout } from "../security/limites";
-import { mask } from "../security/mask";
-import { redactarError } from "../security/redact";
-import { dictamenSeguro, ejecutarToolConEventos, eventoConfirmacion, type Emitir, type FirmarToken } from "./ejecutar";
-import { cargarPrompt } from "./prompt";
+import type { CtxHerramienta, EventoChat } from "../domain/contratos-oc";
+import { HallazgoSchema } from "../domain/contratos-oc";
+import type { LlmAdapter, LlamadaHerramienta, RespuestaLlm } from "../llm/adapter";
+import { TiempoAgotadoError, conTimeout } from "../security/limites";
+import { redact, redactarError } from "../security/redact";
+import type { Bitacora } from "./bitacora";
+import { casoConfirmado, crearGuardia } from "./confirmacion";
+import type { RegistroHerramientas, ResultadoHerramienta } from "./herramientas";
+import type { Sesion } from "./sesiones";
 
-export interface EntradaAgente {
-  historial: TurnoHistorial[];
+export type Emitir = (evento: EventoChat) => void | Promise<void>;
+
+export interface ConfigTurno {
+  maxIteraciones: number;
+  maxTokensSesion: number;
+  timeoutLlmMs: number;
+}
+
+export interface EntradaTurno {
+  llm: LlmAdapter;
+  registro: RegistroHerramientas;
+  sistema: string;
+  sesion: Sesion;
   mensaje: string;
-  llm: LlmPort;
-  nucleo: NucleoOC;
+  /** Caso que la UI confirma con su botón. */
+  confirmar?: string;
   emitir: Emitir;
-  firmarToken: FirmarToken;
-  /** Por defecto agent/prompt.md. */
-  sistema?: string;
-  timeoutLlmMs?: number;
-  maxIteraciones?: number;
-  /** Destino de logs internos (ya redactados). Por defecto console.error. */
+  bitacora: Bitacora;
+  /** Raíz del proyecto (ctx.directory). */
+  directory: string;
+  config: ConfigTurno;
+  /** Destino de logs internos; todo pasa por redact(). Por defecto console.error. */
   registrar?: (mensaje: string) => void;
+  ahora?: () => Date;
 }
 
-const ArgsSolicitudSchema = z.object({ solicitudId: z.string().min(1) });
+/** Lo mínimo que necesita una llamada a herramienta (también la usa «Revisar sin IA»). */
+export type ContextoLlamada = Pick<EntradaTurno, "registro" | "emitir" | "bitacora" | "sesion" | "registrar" | "ahora">;
 
-export async function ejecutarAgente(entrada: EntradaAgente): Promise<void> {
-  const { llm, nucleo, emitir, firmarToken } = entrada;
-  const sistema = entrada.sistema ?? cargarPrompt();
-  const timeoutLlmMs = entrada.timeoutLlmMs ?? LIMITES.timeoutLlmMs;
-  const maxIteraciones = entrada.maxIteraciones ?? LIMITES.maxIteraciones;
-  const registrar = entrada.registrar ?? ((m: string) => console.error(m));
+const CODIGOS_CONFIRMACION = new Set(["REQUIERE_CONFIRMACION", "CONFIRMACION_NO_HUMANA"]);
 
-  const historial: TurnoHistorial[] = [...entrada.historial, { tipo: "usuario", texto: entrada.mensaje }];
-  const fin = async (): Promise<void> => emitir({ tipo: "fin", historial });
+const ValidacionLaxaSchema = z.object({
+  caso: z.string().optional(),
+  apta: z.boolean(),
+  confirmaciones: z.array(HallazgoSchema).default([]),
+});
+const OcCreadaLaxaSchema = z.object({
+  numero_oc: z.string(),
+  fecha: z.string(),
+  idempotente: z.boolean().default(false),
+  retroactiva: z.boolean().default(false),
+  evidencia: z.string().nullable().default(null),
+});
+const ConfirmacionesSchema = z.object({ caso: z.string().optional(), confirmaciones: z.array(HallazgoSchema).default([]) });
 
-  for (let iteracion = 0; iteracion < maxIteraciones; iteracion++) {
-    let respuesta;
-    try {
-      respuesta = await conTimeout(llm.generar({ sistema, historial, tools: nucleo.herramientas }), timeoutLlmMs);
-    } catch (e) {
-      const correlationId = randomUUID();
-      registrar(`[${correlationId}] error del LLM: ${redactarError(e)}`);
-      await emitir({ tipo: "error", mensaje: "No pude consultar al asistente. Inténtalo de nuevo.", correlationId });
-      await fin();
-      return;
-    }
-
-    historial.push({ tipo: "modelo", texto: respuesta.texto, llamadas: respuesta.llamadas, nativo: respuesta.nativo });
-    if (respuesta.texto) await emitir({ tipo: "mensaje", texto: respuesta.texto });
-    if (respuesta.llamadas.length === 0) {
-      await fin();
-      return;
-    }
-
-    for (const llamada of respuesta.llamadas) {
-      const resultado = await resolverLlamada(llamada, nucleo, emitir, firmarToken);
-      historial.push({ tipo: "resultado_tool", llamadaId: llamada.id, nombre: llamada.nombre, resultado });
-    }
-  }
-
-  await emitir({ tipo: "mensaje", texto: "Alcancé el límite de pasos de esta consulta. Reformula o divide la petición." });
-  await fin();
+export interface EstadoTurno {
+  /** Herramientas ejecutadas en este turno (para el resumen al agotar iteraciones). */
+  ejecutadas: Array<{ nombre: string; ok: boolean }>;
+  pendienteNuevo: boolean;
+  confirmacionEmitida: boolean;
 }
 
-/** Devuelve lo que ve el modelo como resultado de la llamada (ya enmascarado). */
-async function resolverLlamada(llamada: LlamadaTool, nucleo: NucleoOC, emitir: Emitir, firmarToken: FirmarToken): Promise<unknown> {
-  const tool = nucleo.herramientas.find((t) => t.nombre === llamada.nombre);
-  if (!tool) {
-    const resultado = { error: `Herramienta desconocida: ${llamada.nombre}` };
-    await emitir({ tipo: "tool_call", id: llamada.id, nombre: llamada.nombre, entrada: mask(llamada.args) });
-    await emitir({ tipo: "tool_result", id: llamada.id, nombre: llamada.nombre, salida: resultado, ok: false, ms: 0 });
-    return resultado;
-  }
-  if (!tool.requiereConfirmacion) {
-    return (await ejecutarToolConEventos(tool, llamada.id, llamada.args, emitir)).resultado;
-  }
-  return pedirConfirmacion(llamada, nucleo, emitir, firmarToken);
+export function dataDe(salida: unknown): unknown {
+  return salida !== null && typeof salida === "object" ? (salida as Record<string, unknown>)["data"] : undefined;
 }
 
-async function pedirConfirmacion(llamada: LlamadaTool, nucleo: NucleoOC, emitir: Emitir, firmarToken: FirmarToken): Promise<unknown> {
-  const { id, nombre } = llamada;
-  const inicio = performance.now();
-  const terminar = async (ok: boolean, salida: unknown): Promise<unknown> => {
-    await emitir({ tipo: "tool_result", id, nombre, salida, ok, ms: Math.round(performance.now() - inicio) });
-    return salida;
-  };
-  await emitir({ tipo: "tool_call", id, nombre, entrada: mask(llamada.args) });
+function casoDe(args: unknown, salida: unknown): string | undefined {
+  const deSalida = (salida as Record<string, unknown> | null)?.["caso"] ?? (dataDe(salida) as Record<string, unknown> | undefined)?.["caso"];
+  if (typeof deSalida === "string") return deSalida;
+  const deArgs = (args as Record<string, unknown> | null)?.["caso"];
+  return typeof deArgs === "string" ? deArgs : undefined;
+}
 
-  const args = ArgsSolicitudSchema.safeParse(llamada.args);
-  if (!args.success) return terminar(false, { error: "Argumentos inválidos: se requiere solicitudId (texto)." });
+async function reaccionarACrear(
+  llamada: LlamadaHerramienta,
+  r: ResultadoHerramienta,
+  { sesion, emitir }: ContextoLlamada,
+  estado: EstadoTurno,
+): Promise<void> {
+  const caso = casoDe(llamada.args, r.salida);
+  if (caso === undefined) return;
+  if (r.ok) {
+    const creada = OcCreadaLaxaSchema.safeParse(dataDe(r.salida));
+    if (!creada.success) return;
+    sesion.pendiente = null;
+    await emitir({ tipo: "oc_creada", caso, ...creada.data });
+    return;
+  }
+  if (r.codigo !== undefined && CODIGOS_CONFIRMACION.has(r.codigo)) {
+    const { confirmaciones } = ConfirmacionesSchema.parse(r.salida);
+    sesion.pendiente = { caso, confirmaciones };
+    estado.confirmacionEmitida = true;
+    await emitir({ tipo: "confirmacion_requerida", caso, confirmaciones });
+  }
+}
 
-  let dictamen;
+/** oc_validar con confirmaciones deja el caso pendiente: la siguiente confirmación humana lo desbloquea. */
+function reaccionarAValidar(llamada: LlamadaHerramienta, r: ResultadoHerramienta, { sesion }: ContextoLlamada, estado: EstadoTurno): void {
+  if (!r.ok) return;
+  const validacion = ValidacionLaxaSchema.safeParse(dataDe(r.salida));
+  const caso = casoDe(llamada.args, r.salida);
+  if (!validacion.success || caso === undefined) return;
+  if (validacion.data.apta && validacion.data.confirmaciones.length > 0) {
+    sesion.pendiente = { caso, confirmaciones: validacion.data.confirmaciones };
+    estado.pendienteNuevo = true;
+  }
+}
+
+async function registrarEnBitacora(e: ContextoLlamada, llamada: LlamadaHerramienta, r: ResultadoHerramienta): Promise<void> {
   try {
-    dictamen = await nucleo.evaluarSolicitud(args.data.solicitudId);
-  } catch (e) {
-    return terminar(false, { error: `No se pudo evaluar la solicitud: ${redactarError(e)}` });
-  }
-
-  const confirmacion = eventoConfirmacion(dictamen, firmarToken);
-  if (!confirmacion) {
-    const seguro = dictamenSeguro(dictamen);
-    return terminar(false, {
-      procede: false,
-      decision: seguro.decision,
-      motivo: "La orden de compra no procede con este dictamen. No intentes crearla.",
-      controles: seguro.controles.filter((c) => c.estado !== "OK").map((c) => ({ id: c.id, estado: c.estado, detalle: c.detalle })),
+    await e.bitacora.registrar({
+      ts: (e.ahora ?? (() => new Date()))().toISOString(),
+      sessionId: e.sesion.id,
+      herramienta: llamada.nombre,
+      args: llamada.args,
+      ok: r.ok,
+      ms: r.ms,
+      codigo: r.codigo,
     });
+  } catch (error) {
+    (e.registrar ?? console.error)(redact(`No se pudo escribir out/log.jsonl: ${redactarError(error)}`));
   }
+}
 
-  await emitir(confirmacion);
-  return terminar(true, {
-    estado: "PENDIENTE_CONFIRMACION_HUMANA",
-    mensaje: "La orden NO se ha creado todavía: se pidió confirmación al usuario. No afirmes que existe hasta recibir el evento de OC creada.",
-  });
+export async function procesarLlamada(
+  e: ContextoLlamada,
+  ctx: CtxHerramienta,
+  llamada: LlamadaHerramienta,
+  estado: EstadoTurno,
+): Promise<ResultadoHerramienta> {
+  await e.emitir({ tipo: "tool_call", id: llamada.id, nombre: llamada.nombre, entrada: llamada.args });
+  const r = await e.registro.ejecutar(llamada.nombre, llamada.args, ctx);
+  await registrarEnBitacora(e, llamada, r);
+  await e.emitir({ tipo: "tool_result", id: llamada.id, nombre: llamada.nombre, ok: r.ok, ms: r.ms, salida: r.salida });
+  estado.ejecutadas.push({ nombre: llamada.nombre, ok: r.ok });
+  e.sesion.mensajes.push({ rol: "herramienta", llamadaId: llamada.id, nombre: llamada.nombre, resultado: r.salida });
+  if (llamada.nombre === "oc_crear") await reaccionarACrear(llamada, r, e, estado);
+  if (llamada.nombre === "oc_validar") reaccionarAValidar(llamada, r, e, estado);
+  return r;
+}
+
+async function emitirError(e: EntradaTurno, mensaje: string): Promise<void> {
+  await e.emitir({ tipo: "error", mensaje, correlationId: randomUUID() });
+}
+
+/** Llama al modelo con timeout; ante un fallo emite un `error` legible (sin secretos) y devuelve null. */
+async function consultarModelo(e: EntradaTurno): Promise<RespuestaLlm | null> {
+  const { llm, registro, sistema, sesion, config } = e;
+  try {
+    return await conTimeout(llm.enviar(sesion.mensajes, registro.descriptores, { sistema, timeoutMs: config.timeoutLlmMs }), config.timeoutLlmMs);
+  } catch (error) {
+    const correlationId = randomUUID();
+    (e.registrar ?? console.error)(redact(`[${correlationId}] error del modelo: ${redactarError(error)}`));
+    const segundos = Math.round(config.timeoutLlmMs / 1000);
+    const mensaje =
+      error instanceof TiempoAgotadoError
+        ? `El modelo tardó más de ${segundos} s en responder. Inténtalo de nuevo.`
+        : "No pude consultar al modelo. Inténtalo de nuevo en unos segundos.";
+    await e.emitir({ tipo: "error", mensaje, correlationId });
+    return null;
+  }
+}
+
+function resumenDeIteraciones(maxIteraciones: number, ejecutadas: EstadoTurno["ejecutadas"]): string {
+  const hecho = ejecutadas.length > 0 ? ejecutadas.map((x) => `${x.nombre} (${x.ok ? "ok" : "con error"})`).join(", ") : "ninguna herramienta";
+  return (
+    `Alcancé el límite de ${maxIteraciones} pasos en este turno y me detuve. ` +
+    `Lo que hice: ${hecho}. Falta terminar el proceso; escribe «continúa» para seguir o indícame cómo avanzar.`
+  );
+}
+
+/** Al terminar el turno, si el caso quedó pendiente y aún no se avisó, la UI debe poder resaltarlo. */
+export async function avisarPendiente(e: ContextoLlamada, estado: EstadoTurno): Promise<void> {
+  const { pendiente } = e.sesion;
+  if (!pendiente || !estado.pendienteNuevo || estado.confirmacionEmitida) return;
+  await e.emitir({ tipo: "confirmacion_requerida", caso: pendiente.caso, confirmaciones: pendiente.confirmaciones });
+}
+
+async function iterar(e: EntradaTurno, ctx: CtxHerramienta, estado: EstadoTurno): Promise<void> {
+  const { sesion, config, emitir } = e;
+  for (let iteracion = 0; iteracion < config.maxIteraciones; iteracion++) {
+    if (sesion.tokens >= config.maxTokensSesion) {
+      await emitirError(e, `Esta sesión alcanzó el límite de ${config.maxTokensSesion} tokens. Abre una sesión nueva para continuar.`);
+      return;
+    }
+    const respuesta = await consultarModelo(e);
+    if (!respuesta) return;
+
+    sesion.tokens += respuesta.tokens;
+    sesion.mensajes.push({ rol: "modelo", texto: respuesta.texto, llamadas: respuesta.llamadas, nativo: respuesta.nativo });
+    if (respuesta.texto) await emitir({ tipo: "mensaje", texto: respuesta.texto });
+    if (respuesta.llamadas.length === 0) return;
+
+    for (const llamada of respuesta.llamadas) await procesarLlamada(e, ctx, llamada, estado);
+  }
+  const resumen = resumenDeIteraciones(config.maxIteraciones, estado.ejecutadas);
+  sesion.mensajes.push({ rol: "modelo", texto: resumen, llamadas: [] });
+  await emitir({ tipo: "mensaje", texto: resumen });
+}
+
+/** Ejecuta un turno completo. Nunca lanza: todo fallo llega al cliente como evento `error` y la sesión sigue viva. */
+export async function ejecutarTurno(e: EntradaTurno): Promise<void> {
+  const { sesion } = e;
+  const confirmado = casoConfirmado({ pendiente: sesion.pendiente, mensaje: e.mensaje, confirmar: e.confirmar });
+  if (confirmado === null) sesion.pendiente = null;
+  const ctx: CtxHerramienta = {
+    directory: e.directory,
+    sessionId: sesion.id,
+    confirmacionHumana: crearGuardia(confirmado),
+    ahora: e.ahora,
+  };
+  const estado: EstadoTurno = { ejecutadas: [], pendienteNuevo: false, confirmacionEmitida: false };
+
+  sesion.mensajes.push({ rol: "usuario", texto: e.mensaje });
+  try {
+    await iterar(e, ctx, estado);
+    await avisarPendiente(e, estado);
+  } catch (error) {
+    const correlationId = randomUUID();
+    (e.registrar ?? console.error)(redact(`[${correlationId}] fallo inesperado en el turno: ${redactarError(error)}`));
+    await e.emitir({ tipo: "error", mensaje: "Ocurrió un error inesperado. La sesión sigue activa; inténtalo de nuevo.", correlationId });
+  }
+  await e.emitir({ tipo: "fin" });
 }

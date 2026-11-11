@@ -56,7 +56,7 @@ describe("conTimeout", () => {
 });
 
 describe("LIMITES", () => {
-  it("fija el tope de iteraciones en 8", () => {
-    assert.equal(LIMITES.maxIteraciones, 8);
+  it("fija el timeout al LLM en 60 s", () => {
+    assert.equal(LIMITES.timeoutLlmMs, 60_000);
   });
 });
