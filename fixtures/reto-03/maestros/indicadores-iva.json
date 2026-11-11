@@ -1,0 +1,5 @@
+[
+  { "codigo": "V0", "tasa": 0 },
+  { "codigo": "V1", "tasa": 0.19 },
+  { "codigo": "V2", "tasa": 0.05 }
+]
