@@ -8,7 +8,6 @@
  *  y los estáticos de dist/web.
  */
 import { randomUUID } from "node:crypto";
-import { readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { serve } from "@hono/node-server";
@@ -27,6 +26,7 @@ import { cargarSistema } from "./agent/prompt";
 import { revisarSinIA } from "./agent/revision";
 import { crearAlmacenSesiones, type AlmacenSesiones } from "./agent/sesiones";
 import { cargarEnv } from "./config/env";
+import { listarCasos } from "./domain/casos";
 import type { EventoChat } from "./domain/contratos-oc";
 import type { LlmAdapter } from "./llm/adapter";
 import { crearLlmGemini } from "./llm/gemini";
@@ -61,10 +61,8 @@ export interface DepsApp {
   rateLimit?: { chat?: VentanaLimite; general?: VentanaLimite };
 }
 
-export async function listarCasosEnDisco(directory: string): Promise<string[]> {
-  const entradas = await readdir(join(directory, "fixtures", "reto-03", "solicitudes"), { withFileTypes: true });
-  return entradas.filter((d) => d.isDirectory()).map((d) => d.name).sort();
-}
+/** Reutiliza el listado del núcleo: solo carpetas con nombre de caso válido (ignora ocultas como .claude/). */
+export const listarCasosEnDisco = (directory: string): Promise<string[]> => listarCasos(directory);
 
 function emisorSse(stream: SSEStreamingApi): Emitir {
   return async (e: EventoChat) => {
